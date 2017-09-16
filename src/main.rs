@@ -1,26 +1,50 @@
+
+mod changequeue;
+mod boundary;
+mod containerutils;
+mod entry;
+mod field;
+
+use field::Field;
+use entry::Entry;
+
 fn main() {
 
-    let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
+    // let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
 
-    let mut test = String::new();
+    // let potentials = [
+    //     Entry::new('─', false, false, true, true),
+    //     Entry::new('┌', false, true, true, false),
+    //     Entry::new('┐', false, true, false, true),
+    //     Entry::new('│', true, true, false, false),
+    //     Entry::new('└', true, false, true, false),
+    //     Entry::new('┘', true, false, false, true),
+    //     Entry::new(' ', false, false, false, false),
+    // ];
 
-    test.push(characters[1]);
-    test.push(characters[0]);
-    test.push(characters[0]);
-    test.push(characters[2]);
-    test.push('\n');
+    // let mut field = Field::new(&potentials, 4, 3);
 
-    test.push(characters[3]);
-    test.push(characters[6]);
-    test.push(characters[6]);
-    test.push(characters[3]);
-    test.push('\n');
+    // let mut test = String::new();
 
-    test.push(characters[4]);
-    test.push(characters[0]);
-    test.push(characters[0]);
-    test.push(characters[5]);
-    test.push('\n');
+    // test.push(potentials[1].character);
+    // test.push(potentials[0].character);
+    // test.push(potentials[0].character);
+    // test.push(potentials[2].character);
+    // test.push('\n');
 
-    println!("{}", test);
+    // test.push(potentials[3].character);
+    // test.push(potentials[6].character);
+    // test.push(potentials[6].character);
+    // test.push(potentials[3].character);
+    // test.push('\n');
+
+    // test.push(potentials[4].character);
+    // test.push(potentials[0].character);
+    // test.push(potentials[0].character);
+    // test.push(potentials[5].character);
+    // test.push('\n');
+
+    // println!("{}", test);
+
+    Field::simple_test();
 }
