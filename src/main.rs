@@ -1,50 +1,52 @@
 
+extern crate rand;
+
 mod changequeue;
 mod boundary;
 mod containerutils;
 mod entry;
 mod field;
 
+
+
 use field::Field;
 use entry::Entry;
 
 fn main() {
 
-    // let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
+    //let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
 
-    // let potentials = [
-    //     Entry::new('─', false, false, true, true),
-    //     Entry::new('┌', false, true, true, false),
-    //     Entry::new('┐', false, true, false, true),
-    //     Entry::new('│', true, true, false, false),
-    //     Entry::new('└', true, false, true, false),
-    //     Entry::new('┘', true, false, false, true),
-    //     Entry::new(' ', false, false, false, false),
-    // ];
+    let potentials = [
+        Entry::new('─', false, false, true, true),
+        Entry::new('┌', false, true, true, false),
+        Entry::new('┐', false, true, false, true),
+        Entry::new('│', true, true, false, false),
+        Entry::new('└', true, false, true, false),
+        Entry::new('┘', true, false, false, true),
+        Entry::new(' ', false, false, false, false),
+    ];
 
-    // let mut field = Field::new(&potentials, 4, 3);
+    let mut field = Field::new(&potentials, 80, 40);
 
-    // let mut test = String::new();
+    if field.close_edges() {
+        let mut rng = rand::thread_rng();
 
-    // test.push(potentials[1].character);
-    // test.push(potentials[0].character);
-    // test.push(potentials[0].character);
-    // test.push(potentials[2].character);
-    // test.push('\n');
+        loop {
 
-    // test.push(potentials[3].character);
-    // test.push(potentials[6].character);
-    // test.push(potentials[6].character);
-    // test.push(potentials[3].character);
-    // test.push('\n');
+            if let Some(result) = field.render() {
+                println!("{}", result);
+                break;
+            }
 
-    // test.push(potentials[4].character);
-    // test.push(potentials[0].character);
-    // test.push(potentials[0].character);
-    // test.push(potentials[5].character);
-    // test.push('\n');
+            if field.step(&mut rng) == false {
+                println!("Failed.");
+                break;
+            }
 
-    // println!("{}", test);
+        }
 
-    Field::simple_test();
+    } else {
+        println!("Could not close edges");
+    }
+
 }

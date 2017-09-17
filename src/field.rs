@@ -1,4 +1,7 @@
 
+use rand::Rng;
+use rand::distributions::{IndependentSample, Range};
+
 use changequeue::ChangeQueue;
 use containerutils::extract_two_elements;
 use boundary::Direction;
@@ -31,14 +34,39 @@ impl FieldPoint {
         }
     }
 
-    fn select(&mut self, index: usize) {
+    fn force(&mut self, index: usize) {
 
-        for i in 0..self.allowed.len() {
-            self.allowed[i] = false;
+
+        for allow in &mut self.allowed {
+            *allow = false;
         }
 
         self.allowed[index] = true;
         self.num_allowed = 1;
+    }
+
+    fn choose<R: Rng>(&mut self, mut rng: &mut R) {
+        assert!(self.num_allowed > 0);
+
+        let mut selection: i32 = Range::new(0, self.num_allowed as i32).ind_sample(&mut rng);
+
+        for allow in &mut self.allowed {
+
+            if *allow {
+
+                if selection > 0 {
+                    *allow = false;
+                    self.num_allowed -= 1;
+                } else if selection < 0 {
+                    *allow = false;
+                    self.num_allowed -= 1;
+                }
+
+                selection -= 1;
+            }
+        }
+
+        assert!(self.num_allowed == 1);
     }
 
     fn extract_selection(&self) -> Option<usize> {
@@ -106,28 +134,6 @@ impl<'a> Field<'a> {
 
     }
 
-    fn apply_failed_edge(
-        &mut self,
-        x: usize,
-        y: usize,
-        potential_index: usize,
-        changes: &mut ChangeQueue<(usize, usize)>,
-    ) -> bool {
-
-        let point_index = self.generate_index(x, y);
-        let point = &mut self.points[point_index];
-        point.invalidate(potential_index);
-
-        if point.num_allowed > 0 {
-            changes.add((x, y));
-            true
-        } else {
-            false
-        }
-
-
-    }
-
     pub fn close_edges(&mut self) -> bool {
 
         let mut changes = ChangeQueue::new();
@@ -178,6 +184,25 @@ impl<'a> Field<'a> {
         self.propagate(changes)
     }
 
+    fn apply_failed_edge(
+        &mut self,
+        x: usize,
+        y: usize,
+        potential_index: usize,
+        changes: &mut ChangeQueue<(usize, usize)>,
+    ) -> bool {
+
+        let point_index = self.generate_index(x, y);
+        let point = &mut self.points[point_index];
+        point.invalidate(potential_index);
+
+        if point.num_allowed > 0 {
+            changes.add((x, y));
+            true
+        } else {
+            false
+        }
+    }
 
     pub fn force_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
 
@@ -185,13 +210,60 @@ impl<'a> Field<'a> {
 
         {
             let mut point = &mut self.points[point_index];
-            point.select(potential_index);
+            point.force(potential_index);
         }
 
         let mut changes = ChangeQueue::new();
         changes.add((x, y));
 
         self.propagate(changes)
+    }
+
+    pub fn step<R: Rng>(&mut self, mut rng: &mut R) -> bool {
+
+        struct BestPoint {
+            point_index: usize,
+            num_allowed: usize,
+        };
+
+        let mut best_point = None;
+
+        for (point_index, point) in self.points.iter().enumerate() {
+
+            if point.num_allowed > 1 {
+                match best_point {
+                    None => {
+                        best_point = Some(BestPoint {
+                            point_index,
+                            num_allowed: point.num_allowed,
+                        })
+                    }
+                    Some(BestPoint { num_allowed, .. }) => {
+                        if num_allowed > point.num_allowed {
+                            best_point = Some(BestPoint {
+                                point_index,
+                                num_allowed: point.num_allowed,
+                            });
+                        }
+                    }
+                }
+
+            }
+        }
+
+        match best_point {
+            None => false,
+            Some(BestPoint { point_index, .. }) => {
+                {
+                    let mut point = &mut self.points[point_index];
+                    point.choose(&mut rng);
+                }
+                let mut changes = ChangeQueue::new();
+                changes.add(self.generate_coord(point_index));
+
+                self.propagate(changes)
+            }
+        }
     }
 
     fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
@@ -246,6 +318,11 @@ impl<'a> Field<'a> {
 
     fn generate_index(&self, x: usize, y: usize) -> usize {
         y * self.width + x
+    }
+
+    fn generate_coord(&self, point_index: usize) -> (usize, usize) {
+
+        (point_index % self.width, point_index / self.width)
     }
 
     fn propagate_direction(
