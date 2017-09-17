@@ -98,7 +98,7 @@ impl<'a> Field<'a> {
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.select_potential(0, 1, 1);
+        field.force_potential(0, 1, 1);
         println!("{:?}", field.points);
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
@@ -179,9 +179,7 @@ impl<'a> Field<'a> {
     }
 
 
-    // #PLH_TODO - Rename to force_potential, leave select_potential open for use when
-    // randomly selecting a potential.
-    pub fn select_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
+    pub fn force_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
 
         let point_index = self.generate_index(x, y);
 
@@ -417,7 +415,7 @@ mod tests {
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        assert!(field.select_potential(0, 1, 1));
+        assert!(field.force_potential(0, 1, 1));
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -440,7 +438,7 @@ mod tests {
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        assert!(field.select_potential(0, 0, 1));
+        assert!(field.force_potential(0, 0, 1));
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -462,7 +460,7 @@ mod tests {
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        assert!(field.select_potential(0, 0, 0));
+        assert!(field.force_potential(0, 0, 0));
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], false);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -484,7 +482,7 @@ mod tests {
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        assert!(field.select_potential(1, 0, 0));
+        assert!(field.force_potential(1, 0, 0));
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], false);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -499,7 +497,7 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        assert_eq!(field.select_potential(0, 0, 1), false);
+        assert_eq!(field.force_potential(0, 0, 1), false);
     }
 
     #[test]
@@ -514,8 +512,8 @@ mod tests {
 
         let mut field = Field::new(&potentials, 2, 2);
 
-        assert!(field.select_potential(0, 0, 0));
-        assert!(field.select_potential(1, 0, 1));
+        assert!(field.force_potential(0, 0, 0));
+        assert!(field.force_potential(1, 0, 1));
 
         if let Some(result) = field.render() {
             let expected = "┌┐\n└┘\n";
