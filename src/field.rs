@@ -60,6 +60,8 @@ impl FieldPoint {
                 } else if selection < 0 {
                     *allow = false;
                     self.num_allowed -= 1;
+                } else {
+                    assert!(*allow);
                 }
 
                 selection -= 1;
