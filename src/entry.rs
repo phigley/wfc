@@ -15,6 +15,10 @@ impl Entry {
     }
 
     pub fn fits(&self, other: &Entry, direction: Direction) -> bool {
-        return self.boundary.fits(&other.boundary, direction);
+        self.boundary.fits(&other.boundary, direction)
+    }
+
+    pub fn requires(&self, direction: Direction) -> bool {
+        self.boundary.requires(direction)
     }
 }

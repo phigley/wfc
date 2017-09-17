@@ -92,15 +92,13 @@ impl<'a> Field<'a> {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(0, 1);
-        field.points[start_index].select(1);
 
         let test_point_index = field.generate_index(0, 0);
 
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.propagate(0, 1);
+        field.select_potential(0, 1, 1);
         println!("{:?}", field.points);
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
@@ -108,6 +106,81 @@ impl<'a> Field<'a> {
 
     }
 
+    fn apply_failed_edge(
+        &mut self,
+        x: usize,
+        y: usize,
+        potential_index: usize,
+        changes: &mut ChangeQueue<(usize, usize)>,
+    ) -> bool {
+
+        let point_index = self.generate_index(x, y);
+        let point = &mut self.points[point_index];
+        point.invalidate(potential_index);
+
+        if point.num_allowed > 0 {
+            changes.add((x, y));
+            true
+        } else {
+            false
+        }
+
+
+    }
+
+    pub fn close_edges(&mut self) -> bool {
+
+        let mut changes = ChangeQueue::new();
+
+        for (potential_index, potential) in self.potentials.iter().enumerate() {
+
+            if potential.requires(Direction::North) {
+
+                for x in 0..self.width {
+                    if !self.apply_failed_edge(x, 0, potential_index, &mut changes) {
+                        return false;
+                    }
+                }
+            }
+
+            if potential.requires(Direction::South) {
+
+                for x in 0..self.width {
+                    let y = self.height - 1;
+                    if !self.apply_failed_edge(x, y, potential_index, &mut changes) {
+                        return false;
+                    }
+                }
+            }
+
+            if potential.requires(Direction::East) {
+
+                for y in 0..self.height {
+                    let x = self.width - 1;
+
+                    if !self.apply_failed_edge(x, y, potential_index, &mut changes) {
+                        return false;
+                    }
+                }
+            }
+
+            if potential.requires(Direction::West) {
+
+                for y in 0..self.height {
+
+                    if !self.apply_failed_edge(0, y, potential_index, &mut changes) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        self.propagate(changes)
+    }
+
+
+    // #PLH_TODO - Rename to force_potential, leave select_potential open for use when
+    // randomly selecting a potential.
     pub fn select_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
 
         let point_index = self.generate_index(x, y);
@@ -117,14 +190,13 @@ impl<'a> Field<'a> {
             point.select(potential_index);
         }
 
-        self.propagate(x, y)
+        let mut changes = ChangeQueue::new();
+        changes.add((x, y));
+
+        self.propagate(changes)
     }
 
-    fn propagate(&mut self, changed_x: usize, changed_y: usize) -> bool {
-
-        let mut changes = ChangeQueue::new();
-
-        changes.add((changed_x, changed_y));
+    fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
 
         while !changes.is_empty() {
             if let Some((x, y)) = changes.next() {
@@ -419,6 +491,18 @@ mod tests {
     }
 
     #[test]
+    fn simple_field_propagate_fail() {
+
+        let potentials = [
+            Entry::new('-', false, false, true, true),
+            Entry::new('┌', false, true, true, false),
+        ];
+
+        let mut field = Field::new(&potentials, 2, 2);
+        assert_eq!(field.select_potential(0, 0, 1), false);
+    }
+
+    #[test]
     fn simple_field_full_propagate() {
 
         let potentials = [
@@ -431,18 +515,69 @@ mod tests {
         let mut field = Field::new(&potentials, 2, 2);
 
         assert!(field.select_potential(0, 0, 0));
+        assert!(field.select_potential(1, 0, 1));
 
-        let other_index = field.generate_index(1, 0);
-        field.points[other_index].select(1);
-        field.propagate(1, 0);
-
-        println!("{:?}", field.points);
         if let Some(result) = field.render() {
             let expected = "┌┐\n└┘\n";
             assert_eq!(result, expected);
 
         } else {
             panic!("Field did not fully propagate.");
+        }
+    }
+
+    #[test]
+    fn simple_field_closed_edges_fail() {
+
+        let potentials = [
+            Entry::new('-', false, false, true, true),
+            Entry::new('|', true, true, false, false),
+        ];
+
+        let mut field = Field::new(&potentials, 2, 2);
+        assert_eq!(field.close_edges(), false);
+    }
+
+    #[test]
+    fn simple_field_closed_edges() {
+        let potentials = [
+            Entry::new('-', false, false, true, true),
+            Entry::new('|', true, true, false, false),
+            Entry::new(' ', false, false, false, false),
+        ];
+
+        let mut field = Field::new(&potentials, 2, 2);
+
+        assert!(field.close_edges());
+
+        if let Some(result) = field.render() {
+            let expected = "  \n  \n";
+            assert_eq!(result, expected);
+
+        } else {
+            panic!("Field did not fully close.");
+        }
+    }
+
+    #[test]
+    fn simple_field_closed_edges2() {
+        let potentials = [
+            Entry::new('┌', false, true, true, false),
+            Entry::new('┐', false, true, false, true),
+            Entry::new('└', true, false, true, false),
+            Entry::new('┘', true, false, false, true),
+        ];
+
+        let mut field = Field::new(&potentials, 2, 2);
+
+        assert!(field.close_edges());
+
+        if let Some(result) = field.render() {
+            let expected = "┌┐\n└┘\n";
+            assert_eq!(result, expected);
+
+        } else {
+            panic!("Field did not fully close.");
         }
     }
 }

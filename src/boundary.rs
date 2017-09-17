@@ -32,6 +32,15 @@ impl Boundary {
             Direction::West => self.west == other.east,
         }
     }
+
+    pub fn requires(&self, direction: Direction) -> bool {
+        match direction {
+            Direction::North => self.north,
+            Direction::East => self.east,
+            Direction::South => self.south,
+            Direction::West => self.west,
+        }
+    }
 }
 
 #[cfg(test)]
