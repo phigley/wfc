@@ -108,7 +108,19 @@ impl<'a> Field<'a> {
 
     }
 
-    pub fn propagate(&mut self, changed_x: usize, changed_y: usize) -> bool {
+    pub fn select_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
+
+        let point_index = self.generate_index(x, y);
+
+        {
+            let mut point = &mut self.points[point_index];
+            point.select(potential_index);
+        }
+
+        self.propagate(x, y)
+    }
+
+    fn propagate(&mut self, changed_x: usize, changed_y: usize) -> bool {
 
         let mut changes = ChangeQueue::new();
 
@@ -174,7 +186,6 @@ impl<'a> Field<'a> {
         changes: &mut ChangeQueue<(usize, usize)>,
     ) -> bool {
 
-
         if let Some((test_x, test_y)) = self.build_delta(x, y, direction) {
 
             let source_point_index = self.generate_index(x, y);
@@ -197,8 +208,6 @@ impl<'a> Field<'a> {
                     changes.add((test_x, test_y));
                 }
             }
-
-
         }
 
         true
@@ -330,15 +339,13 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(0, 1);
-        field.points[start_index].select(1);
 
         let test_point_index = field.generate_index(0, 0);
 
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.propagate(0, 1);
+        assert!(field.select_potential(0, 1, 1));
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -355,15 +362,13 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(0, 0);
-        field.points[start_index].select(1);
 
         let test_point_index = field.generate_index(0, 1);
 
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.propagate(0, 0);
+        assert!(field.select_potential(0, 0, 1));
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -379,15 +384,13 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(0, 0);
-        field.points[start_index].select(0);
 
         let test_point_index = field.generate_index(1, 0);
 
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.propagate(0, 0);
+        assert!(field.select_potential(0, 0, 0));
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], false);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -403,15 +406,13 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(1, 0);
-        field.points[start_index].select(0);
 
         let test_point_index = field.generate_index(0, 0);
 
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.propagate(1, 0);
+        assert!(field.select_potential(1, 0, 0));
         assert_eq!(field.points[test_point_index].allowed[0], true);
         assert_eq!(field.points[test_point_index].allowed[1], false);
         assert_eq!(field.points[test_point_index].allowed[2], false);
@@ -428,10 +429,8 @@ mod tests {
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
-        let start_index = field.generate_index(0, 0);
-        field.points[start_index].select(0);
 
-        field.propagate(0, 0);
+        assert!(field.select_potential(0, 0, 0));
 
         let other_index = field.generate_index(1, 0);
         field.points[other_index].select(1);
@@ -445,6 +444,5 @@ mod tests {
         } else {
             panic!("Field did not fully propagate.");
         }
-
     }
 }
