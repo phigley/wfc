@@ -36,7 +36,7 @@ fn main() {
         let mut rng = rand::thread_rng();
 
         for i in 0..20 {
-            match run_field(field.clone(), &mut rng) {
+            match run_field(&potentials, field.clone(), &mut rng) {
                 Some(result) => {
                     println!("Attemt {} succeeded :", i);
                     println!("{}", result);
@@ -53,11 +53,14 @@ fn main() {
 
 }
 
-fn run_field<R: Rng>(mut field: Field, mut rng: &mut R) -> Option<String> {
+fn run_field<R: Rng>(potentials: &[Entry], mut field: Field, mut rng: &mut R) -> Option<String> {
 
     loop {
 
-        if let Some(result) = field.render() {
+        if let Some(indices) = field.render() {
+
+            let result = entry::make_string(potentials, &indices);
+
             return Some(result);
         }
 

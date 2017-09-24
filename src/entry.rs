@@ -1,9 +1,9 @@
 
-use boundary::{Boundary, Direction};
+use boundary::Boundary;
 
 pub struct Entry {
     pub character: char,
-    boundary: Boundary,
+    pub(crate) boundary: Boundary,
 }
 
 impl Entry {
@@ -13,12 +13,19 @@ impl Entry {
             boundary: Boundary::new(north, south, east, west),
         }
     }
+}
 
-    pub fn fits(&self, other: &Entry, direction: Direction) -> bool {
-        self.boundary.fits(&other.boundary, direction)
+pub fn make_string(potentials: &[Entry], indices: &[Vec<usize>]) -> String {
+
+    let mut result = String::new();
+
+    for row in indices {
+        for i in row {
+            result.push(potentials[*i].character);
+        }
+
+        result.push('\n');
     }
 
-    pub fn requires(&self, direction: Direction) -> bool {
-        self.boundary.requires(direction)
-    }
+    result
 }

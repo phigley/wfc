@@ -6,6 +6,7 @@ pub enum Direction {
     West,
 }
 
+#[derive(Debug, Clone)]
 pub struct Boundary {
     north: bool,
     south: bool,
