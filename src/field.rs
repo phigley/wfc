@@ -307,7 +307,7 @@ impl Field {
                     point.choose(&mut rng);
                 }
                 let mut changes = ChangeQueue::new();
-                changes.add(self.generate_coord(point_index));
+                changes.add(generate_coord(point_index, self.width));
 
                 self.propagate(changes)
             }
@@ -365,11 +365,6 @@ impl Field {
 
         Some(result)
 
-    }
-
-    fn generate_coord(&self, point_index: usize) -> (usize, usize) {
-
-        (point_index % self.width, point_index / self.width)
     }
 
     fn propagate_direction(
@@ -476,6 +471,11 @@ impl Field {
 fn generate_index(x: usize, y: usize, width: usize) -> usize {
     y * width + x
 }
+
+fn generate_coord(point_index: usize, width: usize) -> (usize, usize) {
+    (point_index % width, point_index / width)
+}
+
 
 fn apply_failed_edge(
     x: usize,
