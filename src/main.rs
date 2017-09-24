@@ -1,6 +1,9 @@
 
 extern crate rand;
 
+use std::clone::Clone;
+use rand::Rng;
+
 mod changequeue;
 mod boundary;
 mod containerutils;
@@ -12,15 +15,16 @@ mod field;
 use field::Field;
 use entry::Entry;
 
+
 fn main() {
 
     //let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
 
     let potentials = [
         Entry::new('─', false, false, true, true),
+        Entry::new('│', true, true, false, false),
         Entry::new('┌', false, true, true, false),
         Entry::new('┐', false, true, false, true),
-        Entry::new('│', true, true, false, false),
         Entry::new('└', true, false, true, false),
         Entry::new('┘', true, false, false, true),
         Entry::new(' ', false, false, false, false),
@@ -31,22 +35,34 @@ fn main() {
     if field.close_edges() {
         let mut rng = rand::thread_rng();
 
-        loop {
+        for i in 0..20 {
+            match run_field(field.clone(), &mut rng) {
+                Some(result) => {
+                    println!("Attemt {} succeeded :", i);
+                    println!("{}", result);
+                    break;
+                }
 
-            if let Some(result) = field.render() {
-                println!("{}", result);
-                break;
+                None => println!("Attempt {} failed.", i),
             }
-
-            if field.step(&mut rng) == false {
-                println!("Failed.");
-                break;
-            }
-
         }
 
     } else {
         println!("Could not close edges");
     }
 
+}
+
+fn run_field<R: Rng>(mut field: Field, mut rng: &mut R) -> Option<String> {
+
+    loop {
+
+        if let Some(result) = field.render() {
+            return Some(result);
+        }
+
+        if field.step(&mut rng) == false {
+            return None;
+        }
+    }
 }

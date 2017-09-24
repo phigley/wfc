@@ -7,7 +7,7 @@ use containerutils::extract_two_elements;
 use boundary::Direction;
 use entry::Entry;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct FieldPoint {
     num_allowed: usize,
     allowed: Vec<bool>,
@@ -85,6 +85,54 @@ impl FieldPoint {
     }
 }
 
+struct FoundFieldPoint {
+    point_index: usize,
+    num_allowed: usize,
+    num_encountered: f32,
+}
+
+
+impl FoundFieldPoint {
+    fn new(point_index: usize, num_allowed: usize) -> FoundFieldPoint {
+        FoundFieldPoint {
+            point_index,
+            num_allowed,
+            num_encountered: 1.0,
+        }
+    }
+
+    fn possibly_better<R: Rng>(
+        self,
+        new_point: &FieldPoint,
+        new_point_index: usize,
+        rng: &mut R,
+    ) -> FoundFieldPoint {
+        if new_point.num_allowed < self.num_allowed {
+            // Always go for the less allowed.
+            FoundFieldPoint::new(new_point_index, new_point.num_allowed)
+        } else if new_point.num_allowed == self.num_allowed {
+            let num_encountered = self.num_encountered + 1.0;
+
+            if rng.gen_range(0.0, self.num_encountered) < 1.0 {
+
+                FoundFieldPoint {
+                    point_index: new_point_index,
+                    num_encountered,
+                    ..self
+                }
+            } else {
+                FoundFieldPoint {
+                    num_encountered,
+                    ..self
+                }
+            }
+        } else {
+            self
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Field<'a> {
     potentials: &'a [Entry],
 
@@ -112,28 +160,6 @@ impl<'a> Field<'a> {
             height,
             points,
         }
-    }
-
-    pub fn simple_test() {
-        let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
-        ];
-
-        let mut field = Field::new(&potentials, 2, 2);
-
-        let test_point_index = field.generate_index(0, 0);
-
-        assert_eq!(field.points[test_point_index].allowed[0], true);
-        assert_eq!(field.points[test_point_index].allowed[1], true);
-        assert_eq!(field.points[test_point_index].allowed[2], true);
-        field.force_potential(0, 1, 1);
-        println!("{:?}", field.points);
-        assert_eq!(field.points[test_point_index].allowed[0], false);
-        assert_eq!(field.points[test_point_index].allowed[1], true);
-        assert_eq!(field.points[test_point_index].allowed[2], false);
-
     }
 
     pub fn close_edges(&mut self) -> bool {
@@ -223,39 +249,33 @@ impl<'a> Field<'a> {
 
     pub fn step<R: Rng>(&mut self, mut rng: &mut R) -> bool {
 
-        struct BestPoint {
-            point_index: usize,
-            num_allowed: usize,
-        };
+        let mut possible_best_point = None;
 
-        let mut best_point = None;
+        for (current_point_index, current_point) in self.points.iter().enumerate() {
 
-        for (point_index, point) in self.points.iter().enumerate() {
-
-            if point.num_allowed > 1 {
-                match best_point {
+            if current_point.num_allowed > 1 {
+                match possible_best_point {
                     None => {
-                        best_point = Some(BestPoint {
-                            point_index,
-                            num_allowed: point.num_allowed,
-                        })
+                        possible_best_point = Some(FoundFieldPoint::new(
+                            current_point_index,
+                            current_point.num_allowed,
+                        ))
                     }
-                    Some(BestPoint { num_allowed, .. }) => {
-                        if num_allowed > point.num_allowed {
-                            best_point = Some(BestPoint {
-                                point_index,
-                                num_allowed: point.num_allowed,
-                            });
-                        }
+                    Some(best_point) => {
+                        possible_best_point = Some(best_point.possibly_better(
+                            &current_point,
+                            current_point_index,
+                            &mut rng,
+                        ));
                     }
                 }
 
             }
         }
 
-        match best_point {
+        match possible_best_point {
             None => false,
-            Some(BestPoint { point_index, .. }) => {
+            Some(FoundFieldPoint { point_index, .. }) => {
                 {
                     let mut point = &mut self.points[point_index];
                     point.choose(&mut rng);
