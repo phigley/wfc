@@ -3,13 +3,22 @@ use boundary::Boundary;
 
 pub struct Entry {
     pub character: char,
+    pub weight: f32,
     pub(crate) boundary: Boundary,
 }
 
 impl Entry {
-    pub fn new(character: char, north: bool, south: bool, east: bool, west: bool) -> Entry {
+    pub fn new(
+        character: char,
+        weight: f32,
+        north: bool,
+        south: bool,
+        east: bool,
+        west: bool,
+    ) -> Entry {
         Entry {
             character,
+            weight,
             boundary: Boundary::new(north, south, east, west),
         }
     }

@@ -45,30 +45,33 @@ impl FieldPoint {
         self.num_allowed = 1;
     }
 
-    fn choose<R: Rng>(&mut self, mut rng: &mut R) {
+    fn choose<R: Rng>(&mut self, weights: &[f32], mut rng: &mut R) {
         assert!(self.num_allowed > 0);
 
-        let mut selection: i32 = Range::new(0, self.num_allowed as i32).ind_sample(&mut rng);
+        let normalized_range = Range::new(0.0, 1.0f32);
+        let mut total_weight = 0.0;
+        let mut current_choice = None;
 
-        for allow in &mut self.allowed {
+        for (index, allow) in self.allowed.iter().enumerate() {
 
             if *allow {
 
-                if selection > 0 {
-                    *allow = false;
-                    self.num_allowed -= 1;
-                } else if selection < 0 {
-                    *allow = false;
-                    self.num_allowed -= 1;
-                } else {
-                    assert!(*allow);
-                }
+                let current_weight = weights[index];
 
-                selection -= 1;
+                total_weight += current_weight;
+
+                if normalized_range.ind_sample(&mut rng) * total_weight < current_weight {
+                    current_choice = Some(index);
+                }
             }
+
         }
 
-        assert!(self.num_allowed == 1);
+        if let Some(index) = current_choice {
+            self.force(index);
+        } else {
+            panic!("did not find an index!");
+        }
     }
 
     fn extract_selection(&self) -> Option<usize> {
@@ -137,6 +140,7 @@ pub struct Field {
     num_potentials: usize,
 
     boundaries: Vec<Boundary>,
+    weights: Vec<f32>,
 
     width: usize,
     height: usize,
@@ -149,23 +153,30 @@ impl Field {
 
         let num_potentials = potentials.len();
         let mut boundaries = Vec::with_capacity(num_potentials);
+        let mut weights = Vec::with_capacity(num_potentials);
 
         for entry in potentials {
             boundaries.push(entry.boundary.clone());
+            weights.push(entry.weight);
         }
 
+        let mut prototype_fieldpoint = FieldPoint::new(num_potentials);
+
+        for (entry_index, entry) in potentials.iter().enumerate() {
+            if entry.weight <= 0.0 {
+                prototype_fieldpoint.invalidate(entry_index);
+            }
+        }
 
         let num_points = width * height;
 
-        let mut points = Vec::with_capacity(num_points);
-
-        for _ in 0..num_points {
-            points.push(FieldPoint::new(num_potentials));
-        }
+        let mut points = Vec::new();
+        points.resize(num_points, prototype_fieldpoint);
 
         Field {
             num_potentials,
             boundaries,
+            weights,
             width,
             height,
             points,
@@ -304,7 +315,7 @@ impl Field {
             Some(FoundFieldPoint { point_index, .. }) => {
                 {
                     let mut point = &mut self.points[point_index];
-                    point.choose(&mut rng);
+                    point.choose(&self.weights, &mut rng);
                 }
                 let mut changes = ChangeQueue::new();
                 changes.add(generate_coord(point_index, self.width));
@@ -504,6 +515,7 @@ mod tests {
     use super::*;
 
     use entry;
+    use rand;
 
     #[test]
     fn initialize_fieldpoint() {
@@ -550,12 +562,34 @@ mod tests {
     }
 
     #[test]
+    fn field_point_choose() {
+        let weights = [0.1, 0.2, 0.3, 10.1];
+
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..20 {
+            let mut fieldpoint = FieldPoint::new(4);
+
+            fieldpoint.choose(&weights, &mut rng);
+
+            assert_eq!(fieldpoint.num_allowed, 1);
+
+            if let Some(chosen_index) = fieldpoint.extract_selection() {
+                assert!(chosen_index < 4);
+            } else {
+                panic!("failed to extract selection");
+            }
+
+        }
+    }
+
+    #[test]
     fn simple_field_propagate_north() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
+            Entry::new(' ', 1.0, false, false, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -576,9 +610,9 @@ mod tests {
     fn simple_field_propagate_south() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
+            Entry::new(' ', 1.0, false, false, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -598,9 +632,9 @@ mod tests {
     fn simple_field_propagate_east() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
+            Entry::new(' ', 1.0, false, false, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -620,9 +654,9 @@ mod tests {
     fn simple_field_propagate_west() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
+            Entry::new(' ', 1.0, false, false, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -642,8 +676,8 @@ mod tests {
     fn simple_field_propagate_fail() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('┌', false, true, true, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('┌', 1.0, false, true, true, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -654,10 +688,10 @@ mod tests {
     fn simple_field_full_propagate() {
 
         let potentials = [
-            Entry::new('┌', false, true, true, false),
-            Entry::new('┐', false, true, false, true),
-            Entry::new('└', true, false, true, false),
-            Entry::new('┘', true, false, false, true),
+            Entry::new('┌', 1.0, false, true, true, false),
+            Entry::new('┐', 1.0, false, true, false, true),
+            Entry::new('└', 1.0, true, false, true, false),
+            Entry::new('┘', 1.0, true, false, false, true),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -679,8 +713,8 @@ mod tests {
     fn simple_field_closed_edges_fail() {
 
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -690,9 +724,9 @@ mod tests {
     #[test]
     fn simple_field_closed_edges() {
         let potentials = [
-            Entry::new('-', false, false, true, true),
-            Entry::new('|', true, true, false, false),
-            Entry::new(' ', false, false, false, false),
+            Entry::new('-', 1.0, false, false, true, true),
+            Entry::new('|', 1.0, true, true, false, false),
+            Entry::new(' ', 1.0, false, false, false, false),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -712,10 +746,10 @@ mod tests {
     #[test]
     fn simple_field_closed_edges2() {
         let potentials = [
-            Entry::new('┌', false, true, true, false),
-            Entry::new('┐', false, true, false, true),
-            Entry::new('└', true, false, true, false),
-            Entry::new('┘', true, false, false, true),
+            Entry::new('┌', 1.0, false, true, true, false),
+            Entry::new('┐', 1.0, false, true, false, true),
+            Entry::new('└', 1.0, true, false, true, false),
+            Entry::new('┘', 1.0, true, false, false, true),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -730,5 +764,25 @@ mod tests {
         } else {
             panic!("Field did not fully close.");
         }
+    }
+
+    #[test]
+    fn zero_weight_invalidated() {
+        let potentials = [
+            Entry::new('┌', 0.1, false, true, true, false),
+            Entry::new('┐', 1.0, false, true, false, true),
+            Entry::new('└', 0.0, true, false, true, false),
+            Entry::new('┘', -1.0, true, false, false, true),
+        ];
+
+        let field = Field::new(&potentials, 2, 2);
+
+        for p in field.points {
+            assert_eq!(p.allowed[0], true);
+            assert_eq!(p.allowed[1], true);
+            assert_eq!(p.allowed[2], false);
+            assert_eq!(p.allowed[3], false);
+        }
+
     }
 }

@@ -21,13 +21,13 @@ fn main() {
     //let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
 
     let potentials = [
-        Entry::new('─', false, false, true, true),
-        Entry::new('│', true, true, false, false),
-        Entry::new('┌', false, true, true, false),
-        Entry::new('┐', false, true, false, true),
-        Entry::new('└', true, false, true, false),
-        Entry::new('┘', true, false, false, true),
-        Entry::new(' ', false, false, false, false),
+        Entry::new('─', 10.0, false, false, true, true),
+        Entry::new('│', 10.0, true, true, false, false),
+        Entry::new('┌', 1.0, false, true, true, false),
+        Entry::new('┐', 1.0, false, true, false, true),
+        Entry::new('└', 1.0, true, false, true, false),
+        Entry::new('┘', 1.0, true, false, false, true),
+        Entry::new(' ', 0.5, false, false, false, false),
     ];
 
     let mut field = Field::new(&potentials, 80, 40);
