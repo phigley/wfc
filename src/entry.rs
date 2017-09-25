@@ -30,9 +30,15 @@ pub fn make_string(potentials: &[Entry], indices: &[Vec<usize>]) -> String {
 
     for row in indices {
         for i in row {
-            result.push(potentials[*i].character);
-        }
+            if *i < potentials.len() {
+                result.push(potentials[*i].character);
+            } else if *i == potentials.len() {
+                result.push('?');
+            } else {
+                result.push('!');
+            }
 
+        }
         result.push('\n');
     }
 

@@ -27,7 +27,7 @@ fn main() {
         Entry::new('┐', 1.0, false, true, false, true),
         Entry::new('└', 1.0, true, false, true, false),
         Entry::new('┘', 1.0, true, false, false, true),
-        Entry::new(' ', 0.5, false, false, false, false),
+        //Entry::new(' ', 1.0, false, false, false, false),
     ];
 
     let mut field = Field::new(&potentials, 80, 40);
@@ -65,6 +65,12 @@ fn run_field<R: Rng>(potentials: &[Entry], mut field: Field, mut rng: &mut R) ->
         }
 
         if field.step(&mut rng) == false {
+            // if let Some(indices) = field.render_partial() {
+            //     let result = entry::make_string(potentials, &indices);
+
+            //     return Some(result);
+
+            // }
             return None;
         }
     }

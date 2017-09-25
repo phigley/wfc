@@ -1,4 +1,6 @@
 
+use std::f32;
+
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
@@ -45,7 +47,7 @@ impl FieldPoint {
         self.num_allowed = 1;
     }
 
-    fn choose<R: Rng>(&mut self, weights: &[f32], mut rng: &mut R) {
+    fn choose<R: Rng>(&mut self, weights: &[PointWeight], mut rng: &mut R) {
         assert!(self.num_allowed > 0);
 
         let normalized_range = Range::new(0.0, 1.0f32);
@@ -56,7 +58,7 @@ impl FieldPoint {
 
             if *allow {
 
-                let current_weight = weights[index];
+                let current_weight = weights[index].weight;
 
                 total_weight += current_weight;
 
@@ -90,16 +92,16 @@ impl FieldPoint {
 
 struct FoundFieldPoint {
     point_index: usize,
-    num_allowed: usize,
     num_encountered: f32,
+    entropy: f32,
 }
 
 
 impl FoundFieldPoint {
-    fn new(point_index: usize, num_allowed: usize) -> FoundFieldPoint {
+    fn new(point: &FieldPoint, point_index: usize, weights: &[PointWeight]) -> FoundFieldPoint {
         FoundFieldPoint {
             point_index,
-            num_allowed,
+            entropy: measure_entropy(&point, &weights),
             num_encountered: 1.0,
         }
     }
@@ -108,12 +110,22 @@ impl FoundFieldPoint {
         self,
         new_point: &FieldPoint,
         new_point_index: usize,
+        weights: &[PointWeight],
         rng: &mut R,
     ) -> FoundFieldPoint {
-        if new_point.num_allowed < self.num_allowed {
-            // Always go for the less allowed.
-            FoundFieldPoint::new(new_point_index, new_point.num_allowed)
-        } else if new_point.num_allowed == self.num_allowed {
+
+        let new_entropy = measure_entropy(&new_point, &weights);
+
+        let epsilon = 1e-6f32;
+
+        if new_entropy < self.entropy - epsilon {
+            // Always go for the lower entropy.
+            FoundFieldPoint::new(&new_point, new_point_index, &weights)
+        } else if new_entropy > self.entropy + epsilon {
+            // Always reject higher entropy.
+            self
+        } else {
+            // They are nearly equal, use single pass fair selector.fair
             let num_encountered = self.num_encountered + 1.0;
 
             if rng.gen_range(0.0, self.num_encountered) < 1.0 {
@@ -129,10 +141,41 @@ impl FoundFieldPoint {
                     ..self
                 }
             }
-        } else {
-            self
         }
     }
+}
+
+#[derive(Clone)]
+struct PointWeight {
+    weight: f32,
+    entropic_element: f32,
+}
+
+impl PointWeight {
+    pub fn new(weight: f32) -> PointWeight {
+
+        PointWeight {
+            weight,
+            entropic_element: weight * weight.ln(),
+        }
+    }
+}
+
+fn measure_entropy(point: &FieldPoint, weights: &[PointWeight]) -> f32 {
+
+    let mut total_weight = 0.0f32;
+    let mut total_component = 0.0f32;
+
+    for (index, allowed) in point.allowed.iter().enumerate() {
+
+        if *allowed {
+
+            total_weight += weights[index].weight;
+            total_component += weights[index].entropic_element;
+        }
+    }
+
+    total_weight.ln() - (total_component / total_weight)
 }
 
 #[derive(Clone)]
@@ -140,7 +183,7 @@ pub struct Field {
     num_potentials: usize,
 
     boundaries: Vec<Boundary>,
-    weights: Vec<f32>,
+    weights: Vec<PointWeight>,
 
     width: usize,
     height: usize,
@@ -157,7 +200,7 @@ impl Field {
 
         for entry in potentials {
             boundaries.push(entry.boundary.clone());
-            weights.push(entry.weight);
+            weights.push(PointWeight::new(entry.weight));
         }
 
         let mut prototype_fieldpoint = FieldPoint::new(num_potentials);
@@ -312,16 +355,21 @@ impl Field {
                 match result {
                     None => {
                         result = Some(FoundFieldPoint::new(
+                            &current_point,
                             current_point_index,
-                            current_point.num_allowed,
+                            &self.weights,
                         ))
                     }
                     Some(best_point) => {
-                        result = Some(best_point.possibly_better(
+
+                        let new_best_point = best_point.possibly_better(
                             &current_point,
                             current_point_index,
+                            &self.weights,
                             &mut rng,
-                        ));
+                        );
+
+                        result = Some(new_best_point);
                     }
                 }
             }
@@ -383,6 +431,35 @@ impl Field {
 
     }
 
+    pub fn render_partial(&self) -> Option<Vec<Vec<usize>>> {
+
+        let mut result = Vec::with_capacity(self.height);
+
+        for y in 0..self.height {
+
+            let mut row = Vec::with_capacity(self.width);
+
+            for x in 0..self.width {
+
+                let point_index = generate_index(x, y, self.width);
+                let point = &self.points[point_index];
+
+                if let Some(i) = point.extract_selection() {
+                    row.push(i);
+                } else if point.num_allowed > 0 {
+                    row.push(self.num_potentials);
+                } else {
+                    row.push(usize::max_value());
+                }
+            }
+
+            result.push(row);
+        }
+
+        Some(result)
+
+    }
+
     fn propagate_direction(
         &mut self,
         x: usize,
@@ -399,13 +476,7 @@ impl Field {
             if let Some((source_point, mut test_point)) =
                 extract_two_elements(&mut self.points, source_point_index, test_point_index)
             {
-                if Self::test_direction(
-                    &self.boundaries,
-                    source_point,
-                    &mut test_point,
-                    direction,
-                )
-                {
+                if test_direction(&self.boundaries, source_point, &mut test_point, direction) {
                     if test_point.num_allowed == 0 {
                         return false;
                     }
@@ -424,7 +495,7 @@ impl Field {
             Direction::North => if y == 0 { None } else { Some((x, y - 1)) },
 
             Direction::South => {
-                if y == self.height {
+                if y == self.height - 1 {
                     None
                 } else {
                     Some((x, y + 1))
@@ -432,7 +503,7 @@ impl Field {
             }
 
             Direction::East => {
-                if x == self.width {
+                if x == self.width - 1 {
                     None
                 } else {
                     Some((x + 1, y))
@@ -441,45 +512,6 @@ impl Field {
 
             Direction::West => if x == 0 { None } else { Some((x - 1, y)) },
         }
-    }
-
-    fn test_direction(
-        potentials: &[Boundary],
-        source_point: &FieldPoint,
-        test_point: &mut FieldPoint,
-        direction: Direction,
-    ) -> bool {
-
-        let mut changed = false;
-
-        for test_index in 0..potentials.len() {
-
-            if test_point.allowed[test_index] {
-
-                let mut fits = false;
-
-                for source_index in 0..potentials.len() {
-
-                    if source_point.allowed[source_index] {
-                        if potentials[source_index].fits(&potentials[test_index], direction) {
-                            fits = true;
-                            break;
-                        }
-
-                    }
-
-                }
-
-                if !fits {
-                    test_point.invalidate(test_index);
-                    changed = true;
-                }
-            }
-        }
-
-        changed
-
-
     }
 }
 
@@ -492,6 +524,42 @@ fn generate_coord(point_index: usize, width: usize) -> (usize, usize) {
     (point_index % width, point_index / width)
 }
 
+fn test_direction(
+    potentials: &[Boundary],
+    source_point: &FieldPoint,
+    test_point: &mut FieldPoint,
+    direction: Direction,
+) -> bool {
+
+    let mut changed = false;
+
+    for test_index in 0..potentials.len() {
+
+        if test_point.allowed[test_index] {
+
+            let mut fits = false;
+
+            for source_index in 0..potentials.len() {
+
+                if source_point.allowed[source_index] {
+                    if potentials[source_index].fits(&potentials[test_index], direction) {
+                        fits = true;
+                        break;
+                    }
+
+                }
+
+            }
+
+            if !fits {
+                test_point.invalidate(test_index);
+                changed = true;
+            }
+        }
+    }
+
+    changed
+}
 
 fn apply_failed_edge(
     x: usize,
@@ -568,7 +636,12 @@ mod tests {
 
     #[test]
     fn field_point_choose() {
-        let weights = [0.1, 0.2, 0.3, 10.1];
+        let weights = [
+            PointWeight::new(0.1),
+            PointWeight::new(0.2),
+            PointWeight::new(0.3),
+            PointWeight::new(10.1),
+        ];
 
         let mut rng = rand::thread_rng();
 
@@ -586,6 +659,36 @@ mod tests {
             }
 
         }
+    }
+
+    #[test]
+    fn found_fieldpoint() {
+        let weights = [
+            PointWeight::new(0.1),
+            PointWeight::new(0.2),
+            PointWeight::new(0.3),
+            PointWeight::new(10.1),
+        ];
+
+        let mut rng = rand::thread_rng();
+
+        let mut fieldpoint_0 = FieldPoint::new(4);
+        let mut fieldpoint_1 = FieldPoint::new(4);
+
+        fieldpoint_1.invalidate(0);
+
+        let inital_best_fieldpoint_a = FoundFieldPoint::new(&fieldpoint_0, 0, &weights);
+        let best_fieldpoint_a =
+            inital_best_fieldpoint_a.possibly_better(&fieldpoint_1, 1, &weights, &mut rng);
+
+        assert_eq!(best_fieldpoint_a.point_index, 1);
+
+        fieldpoint_0.invalidate(1);
+        let inital_best_fieldpoint_b = FoundFieldPoint::new(&fieldpoint_0, 0, &weights);
+        let best_fieldpoint_b =
+            inital_best_fieldpoint_b.possibly_better(&fieldpoint_1, 1, &weights, &mut rng);
+
+        assert_eq!(best_fieldpoint_b.point_index, 0);
     }
 
     #[test]
