@@ -286,29 +286,7 @@ impl Field {
 
     pub fn step<R: Rng>(&mut self, mut rng: &mut R) -> bool {
 
-        let mut possible_best_point = None;
-
-        for (current_point_index, current_point) in self.points.iter().enumerate() {
-
-            if current_point.num_allowed > 1 {
-                match possible_best_point {
-                    None => {
-                        possible_best_point = Some(FoundFieldPoint::new(
-                            current_point_index,
-                            current_point.num_allowed,
-                        ))
-                    }
-                    Some(best_point) => {
-                        possible_best_point = Some(best_point.possibly_better(
-                            &current_point,
-                            current_point_index,
-                            &mut rng,
-                        ));
-                    }
-                }
-
-            }
-        }
+        let possible_best_point = self.observe(&mut rng);
 
         match possible_best_point {
             None => false,
@@ -323,6 +301,33 @@ impl Field {
                 self.propagate(changes)
             }
         }
+    }
+
+    fn observe<R: Rng>(&self, mut rng: &mut R) -> Option<FoundFieldPoint> {
+        let mut result = None;
+
+        for (current_point_index, current_point) in self.points.iter().enumerate() {
+
+            if current_point.num_allowed > 1 {
+                match result {
+                    None => {
+                        result = Some(FoundFieldPoint::new(
+                            current_point_index,
+                            current_point.num_allowed,
+                        ))
+                    }
+                    Some(best_point) => {
+                        result = Some(best_point.possibly_better(
+                            &current_point,
+                            current_point_index,
+                            &mut rng,
+                        ));
+                    }
+                }
+            }
+        }
+
+        result
     }
 
     fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
