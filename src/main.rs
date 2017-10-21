@@ -1,20 +1,10 @@
-
+extern crate wfc;
 extern crate rand;
 
-use std::clone::Clone;
+use wfc::field::Field;
+use wfc::entry::Entry;
+use wfc::entry;
 use rand::Rng;
-
-mod changequeue;
-mod boundary;
-mod containerutils;
-mod entry;
-mod field;
-
-
-
-use field::Field;
-use entry::Entry;
-
 
 fn main() {
 

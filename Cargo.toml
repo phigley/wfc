@@ -3,5 +3,15 @@ name = "wfc"
 version = "0.1.0"
 authors = ["Peter Higley <phigley@gmail.com>"]
 
+[lib]
+name = "wfc"
+doc = true
+test = true
+
+[[bin]]
+name = "wfc"
+test = false
+doc = false
+
 [dependencies]
 rand = "*"
