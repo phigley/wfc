@@ -5,7 +5,6 @@ pub fn extract_two_elements<T>(
     index0: usize,
     index1: usize,
 ) -> Option<(&mut T, &mut T)> {
-
     let container_len = container.len();
     let mut iter = container.iter_mut();
 
@@ -22,7 +21,6 @@ pub fn extract_two_elements<T>(
         } else {
             None
         }
-
     } else {
         None
     }

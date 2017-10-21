@@ -6,11 +6,12 @@ pub struct ChangeQueue<T: PartialEq + Debug> {
 
 impl<T: PartialEq + Debug> ChangeQueue<T> {
     pub fn new() -> ChangeQueue<T> {
-        ChangeQueue { pending: Vec::new() }
+        ChangeQueue {
+            pending: Vec::new(),
+        }
     }
 
     pub fn add(&mut self, value: T) {
-
         for p in self.pending.iter() {
             if *p == value {
                 return;
@@ -37,7 +38,6 @@ mod tests {
 
     #[test]
     fn simple_change_queue() {
-
         let mut q = ChangeQueue::new();
 
         assert!(q.is_empty());

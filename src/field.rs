@@ -37,8 +37,6 @@ impl FieldPoint {
     }
 
     fn force(&mut self, index: usize) {
-
-
         for allow in &mut self.allowed {
             *allow = false;
         }
@@ -55,9 +53,7 @@ impl FieldPoint {
         let mut current_choice = None;
 
         for (index, allow) in self.allowed.iter().enumerate() {
-
             if *allow {
-
                 let current_weight = weights[index].weight;
 
                 total_weight += current_weight;
@@ -66,7 +62,6 @@ impl FieldPoint {
                     current_choice = Some(index);
                 }
             }
-
         }
 
         if let Some(index) = current_choice {
@@ -77,7 +72,6 @@ impl FieldPoint {
     }
 
     fn extract_selection(&self) -> Option<usize> {
-
         if self.num_allowed == 1 {
             for (i, allow) in self.allowed.iter().enumerate() {
                 if *allow {
@@ -113,7 +107,6 @@ impl FoundFieldPoint {
         weights: &[PointWeight],
         rng: &mut R,
     ) -> FoundFieldPoint {
-
         let new_entropy = measure_entropy(&new_point, &weights);
 
         let epsilon = 1e-6f32;
@@ -129,7 +122,6 @@ impl FoundFieldPoint {
             let num_encountered = self.num_encountered + 1.0;
 
             if rng.gen_range(0.0, self.num_encountered) < 1.0 {
-
                 FoundFieldPoint {
                     point_index: new_point_index,
                     num_encountered,
@@ -153,7 +145,6 @@ struct PointWeight {
 
 impl PointWeight {
     pub fn new(weight: f32) -> PointWeight {
-
         PointWeight {
             weight,
             entropic_element: weight * weight.ln(),
@@ -162,14 +153,11 @@ impl PointWeight {
 }
 
 fn measure_entropy(point: &FieldPoint, weights: &[PointWeight]) -> f32 {
-
     let mut total_weight = 0.0f32;
     let mut total_component = 0.0f32;
 
     for (index, allowed) in point.allowed.iter().enumerate() {
-
         if *allowed {
-
             total_weight += weights[index].weight;
             total_component += weights[index].entropic_element;
         }
@@ -193,7 +181,6 @@ pub struct Field {
 
 impl Field {
     pub fn new(potentials: &[Entry], width: usize, height: usize) -> Field {
-
         let num_potentials = potentials.len();
         let mut boundaries = Vec::with_capacity(num_potentials);
         let mut weights = Vec::with_capacity(num_potentials);
@@ -227,16 +214,13 @@ impl Field {
     }
 
     pub fn close_edges(&mut self) -> bool {
-
         let mut changes = ChangeQueue::new();
 
         {
             let mut points: &mut [FieldPoint] = &mut self.points;
 
             for (potential_index, boundary) in self.boundaries.iter().enumerate() {
-
                 if boundary.requires(Direction::North) {
-
                     for x in 0..self.width {
                         if !apply_failed_edge(
                             x,
@@ -245,15 +229,13 @@ impl Field {
                             potential_index,
                             &mut points,
                             &mut changes,
-                        )
-                        {
+                        ) {
                             return false;
                         }
                     }
                 }
 
                 if boundary.requires(Direction::South) {
-
                     for x in 0..self.width {
                         let y = self.height - 1;
                         if !apply_failed_edge(
@@ -263,15 +245,13 @@ impl Field {
                             potential_index,
                             &mut points,
                             &mut changes,
-                        )
-                        {
+                        ) {
                             return false;
                         }
                     }
                 }
 
                 if boundary.requires(Direction::East) {
-
                     for y in 0..self.height {
                         let x = self.width - 1;
 
@@ -282,17 +262,14 @@ impl Field {
                             potential_index,
                             &mut points,
                             &mut changes,
-                        )
-                        {
+                        ) {
                             return false;
                         }
                     }
                 }
 
                 if boundary.requires(Direction::West) {
-
                     for y in 0..self.height {
-
                         if !apply_failed_edge(
                             0,
                             y,
@@ -300,8 +277,7 @@ impl Field {
                             potential_index,
                             &mut points,
                             &mut changes,
-                        )
-                        {
+                        ) {
                             return false;
                         }
                     }
@@ -313,7 +289,6 @@ impl Field {
     }
 
     pub fn force_potential(&mut self, x: usize, y: usize, potential_index: usize) -> bool {
-
         let point_index = generate_index(x, y, self.width);
 
         {
@@ -328,7 +303,6 @@ impl Field {
     }
 
     pub fn step<R: Rng>(&mut self, mut rng: &mut R) -> bool {
-
         let possible_best_point = self.observe(&mut rng);
 
         match possible_best_point {
@@ -350,7 +324,6 @@ impl Field {
         let mut result = None;
 
         for (current_point_index, current_point) in self.points.iter().enumerate() {
-
             if current_point.num_allowed > 1 {
                 match result {
                     None => {
@@ -361,7 +334,6 @@ impl Field {
                         ))
                     }
                     Some(best_point) => {
-
                         let new_best_point = best_point.possibly_better(
                             &current_point,
                             current_point_index,
@@ -379,10 +351,8 @@ impl Field {
     }
 
     fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
-
         while !changes.is_empty() {
             if let Some((x, y)) = changes.next() {
-
                 if !self.propagate_direction(x, y, Direction::North, &mut changes) {
                     return false;
                 }
@@ -405,15 +375,12 @@ impl Field {
     }
 
     pub fn render(&self) -> Option<Vec<Vec<usize>>> {
-
         let mut result = Vec::with_capacity(self.height);
 
         for y in 0..self.height {
-
             let mut row = Vec::with_capacity(self.width);
 
             for x in 0..self.width {
-
                 let point_index = generate_index(x, y, self.width);
                 let point = &self.points[point_index];
 
@@ -428,19 +395,15 @@ impl Field {
         }
 
         Some(result)
-
     }
 
     pub fn render_partial(&self) -> Vec<Vec<usize>> {
-
         let mut result = Vec::with_capacity(self.height);
 
         for y in 0..self.height {
-
             let mut row = Vec::with_capacity(self.width);
 
             for x in 0..self.width {
-
                 let point_index = generate_index(x, y, self.width);
                 let point = &self.points[point_index];
 
@@ -466,9 +429,7 @@ impl Field {
         direction: Direction,
         changes: &mut ChangeQueue<(usize, usize)>,
     ) -> bool {
-
         if let Some((test_x, test_y)) = self.build_delta(x, y, direction) {
-
             let source_point_index = generate_index(x, y, self.width);
             let test_point_index = generate_index(test_x, test_y, self.width);
 
@@ -489,27 +450,30 @@ impl Field {
     }
 
     fn build_delta(&self, x: usize, y: usize, direction: Direction) -> Option<(usize, usize)> {
-
         match direction {
-            Direction::North => if y == 0 { None } else { Some((x, y - 1)) },
+            Direction::North => if y == 0 {
+                None
+            } else {
+                Some((x, y - 1))
+            },
 
-            Direction::South => {
-                if y == self.height - 1 {
-                    None
-                } else {
-                    Some((x, y + 1))
-                }
-            }
+            Direction::South => if y == self.height - 1 {
+                None
+            } else {
+                Some((x, y + 1))
+            },
 
-            Direction::East => {
-                if x == self.width - 1 {
-                    None
-                } else {
-                    Some((x + 1, y))
-                }
-            }
+            Direction::East => if x == self.width - 1 {
+                None
+            } else {
+                Some((x + 1, y))
+            },
 
-            Direction::West => if x == 0 { None } else { Some((x - 1, y)) },
+            Direction::West => if x == 0 {
+                None
+            } else {
+                Some((x - 1, y))
+            },
         }
     }
 }
@@ -529,25 +493,19 @@ fn test_direction(
     test_point: &mut FieldPoint,
     direction: Direction,
 ) -> bool {
-
     let mut changed = false;
 
     for test_index in 0..potentials.len() {
-
         if test_point.allowed[test_index] {
-
             let mut fits = false;
 
             for source_index in 0..potentials.len() {
-
                 if source_point.allowed[source_index] {
                     if potentials[source_index].fits(&potentials[test_index], direction) {
                         fits = true;
                         break;
                     }
-
                 }
-
             }
 
             if !fits {
@@ -568,7 +526,6 @@ fn apply_failed_edge(
     points: &mut [FieldPoint],
     changes: &mut ChangeQueue<(usize, usize)>,
 ) -> bool {
-
     let point_index = generate_index(x, y, width);
     let point = &mut points[point_index];
     point.invalidate(potential_index);
@@ -591,7 +548,6 @@ mod tests {
 
     #[test]
     fn initialize_fieldpoint() {
-
         let f0 = FieldPoint::new(3);
         let f1 = FieldPoint::new(6);
 
@@ -656,7 +612,6 @@ mod tests {
             } else {
                 panic!("failed to extract selection");
             }
-
         }
     }
 
@@ -692,7 +647,6 @@ mod tests {
 
     #[test]
     fn simple_field_propagate_north() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('|', 1.0, true, true, false, false),
@@ -710,12 +664,10 @@ mod tests {
         assert_eq!(field.points[test_point_index].allowed[0], false);
         assert_eq!(field.points[test_point_index].allowed[1], true);
         assert_eq!(field.points[test_point_index].allowed[2], false);
-
     }
 
     #[test]
     fn simple_field_propagate_south() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('|', 1.0, true, true, false, false),
@@ -737,7 +689,6 @@ mod tests {
 
     #[test]
     fn simple_field_propagate_east() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('|', 1.0, true, true, false, false),
@@ -759,7 +710,6 @@ mod tests {
 
     #[test]
     fn simple_field_propagate_west() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('|', 1.0, true, true, false, false),
@@ -781,7 +731,6 @@ mod tests {
 
     #[test]
     fn simple_field_propagate_fail() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('┌', 1.0, false, true, true, false),
@@ -793,7 +742,6 @@ mod tests {
 
     #[test]
     fn simple_field_full_propagate() {
-
         let potentials = [
             Entry::new('┌', 1.0, false, true, true, false),
             Entry::new('┐', 1.0, false, true, false, true),
@@ -811,17 +759,18 @@ mod tests {
             let expected = "┌┐\n└┘\n";
             let result_str = entry::make_string(&potentials, &result);
             assert_eq!(result_str, expected);
-
         } else {
             let partial_result = field.render_partial();
             let partial_result_str = entry::make_string(&potentials, &partial_result);
-            panic!("Field did not fully propagate. Current status:\n{}", partial_result_str);
+            panic!(
+                "Field did not fully propagate. Current status:\n{}",
+                partial_result_str
+            );
         }
     }
 
     #[test]
     fn simple_field_closed_edges_fail() {
-
         let potentials = [
             Entry::new('-', 1.0, false, false, true, true),
             Entry::new('|', 1.0, true, true, false, false),
@@ -847,7 +796,6 @@ mod tests {
             let expected = "  \n  \n";
             let result_str = entry::make_string(&potentials, &result);
             assert_eq!(result_str, expected);
-
         } else {
             panic!("Field did not fully close.");
         }
@@ -870,7 +818,6 @@ mod tests {
             let expected = "┌┐\n└┘\n";
             let result_str = entry::make_string(&potentials, &result);
             assert_eq!(result_str, expected);
-
         } else {
             panic!("Field did not fully close.");
         }
@@ -893,6 +840,5 @@ mod tests {
             assert_eq!(p.allowed[2], false);
             assert_eq!(p.allowed[3], false);
         }
-
     }
 }

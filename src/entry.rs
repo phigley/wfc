@@ -25,7 +25,6 @@ impl Entry {
 }
 
 pub fn make_string(potentials: &[Entry], indices: &[Vec<usize>]) -> String {
-
     let mut result = String::new();
 
     for row in indices {
@@ -37,7 +36,6 @@ pub fn make_string(potentials: &[Entry], indices: &[Vec<usize>]) -> String {
             } else {
                 result.push('!');
             }
-
         }
         result.push('\n');
     }
