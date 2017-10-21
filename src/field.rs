@@ -145,7 +145,7 @@ impl FoundFieldPoint {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct PointWeight {
     weight: f32,
     entropic_element: f32,
@@ -178,7 +178,7 @@ fn measure_entropy(point: &FieldPoint, weights: &[PointWeight]) -> f32 {
     total_weight.ln() - (total_component / total_weight)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Field {
     num_potentials: usize,
 
@@ -317,7 +317,7 @@ impl Field {
         let point_index = generate_index(x, y, self.width);
 
         {
-            let mut point = &mut self.points[point_index];
+            let point = &mut self.points[point_index];
             point.force(potential_index);
         }
 
@@ -335,7 +335,7 @@ impl Field {
             None => false,
             Some(FoundFieldPoint { point_index, .. }) => {
                 {
-                    let mut point = &mut self.points[point_index];
+                    let point = &mut self.points[point_index];
                     point.choose(&self.weights, &mut rng);
                 }
                 let mut changes = ChangeQueue::new();
@@ -431,7 +431,7 @@ impl Field {
 
     }
 
-    pub fn render_partial(&self) -> Option<Vec<Vec<usize>>> {
+    pub fn render_partial(&self) -> Vec<Vec<usize>> {
 
         let mut result = Vec::with_capacity(self.height);
 
@@ -456,8 +456,7 @@ impl Field {
             result.push(row);
         }
 
-        Some(result)
-
+        result
     }
 
     fn propagate_direction(
@@ -806,6 +805,7 @@ mod tests {
 
         assert!(field.force_potential(0, 0, 0));
         assert!(field.force_potential(1, 0, 1));
+        assert!(field.force_potential(0, 1, 2));
 
         if let Some(result) = field.render() {
             let expected = "┌┐\n└┘\n";
@@ -813,7 +813,9 @@ mod tests {
             assert_eq!(result_str, expected);
 
         } else {
-            panic!("Field did not fully propagate.");
+            let partial_result = field.render_partial();
+            let partial_result_str = entry::make_string(&potentials, &partial_result);
+            panic!("Field did not fully propagate. Current status:\n{}", partial_result_str);
         }
     }
 
