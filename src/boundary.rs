@@ -25,6 +25,7 @@ impl Direction {
         Direction::West,
     ];
 
+
     fn to_index(&self) -> usize {
         match *self {
             Direction::NorthWest => 0,
@@ -54,7 +55,8 @@ impl Direction {
 
 #[derive(Debug, Clone, Default)]
 pub struct Boundary {
-    boundaries: [bool; 8],
+    required: [bool; 8],
+    opposite_required: [bool; 8],
 }
 
 impl Boundary {
@@ -85,7 +87,8 @@ impl Boundary {
             for (c, possible_direction) in borders.as_bytes().iter().zip(&directions) {
                 if let Some(direction) = *possible_direction {
                     if *c == ('1' as u8) {
-                        result.boundaries[direction.to_index()] = true;
+                        result.required[direction.to_index()] = true;
+                        result.opposite_required[direction.to_opposite_index()] = true;
                     } else if *c != ('0' as u8) {
                         return Err(format!(
                             "Found invalid character '{}' in Bound::from_str(\"{}\")",
@@ -102,11 +105,12 @@ impl Boundary {
 
     // returns true if the other fits on direction side.
     pub fn fits(&self, other: &Boundary, direction: Direction) -> bool {
-        self.boundaries[direction.to_index()] == other.boundaries[direction.to_opposite_index()]
+        let index = direction.to_index();
+        self.required[index] == other.opposite_required[index]
     }
 
     pub fn requires(&self, direction: Direction) -> bool {
-        self.boundaries[direction.to_index()]
+        self.required[direction.to_index()]
     }
 }
 
