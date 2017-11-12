@@ -219,8 +219,12 @@ impl Field {
         {
             let mut points: &mut [FieldPoint] = &mut self.points;
 
+            // Do not allow a potential to be on an edge if it requires a connection
+            // in that edge's direction.
             for (potential_index, boundary) in self.boundaries.iter().enumerate() {
-                if boundary.requires(Direction::North) {
+                if boundary.requires(Direction::North) || boundary.requires(Direction::NorthEast)
+                    || boundary.requires(Direction::NorthWest)
+                {
                     for x in 0..self.width {
                         if !apply_failed_edge(
                             x,
@@ -235,23 +239,9 @@ impl Field {
                     }
                 }
 
-                if boundary.requires(Direction::South) {
-                    for x in 0..self.width {
-                        let y = self.height - 1;
-                        if !apply_failed_edge(
-                            x,
-                            y,
-                            self.width,
-                            potential_index,
-                            &mut points,
-                            &mut changes,
-                        ) {
-                            return false;
-                        }
-                    }
-                }
-
-                if boundary.requires(Direction::East) {
+                if boundary.requires(Direction::East) || boundary.requires(Direction::NorthEast)
+                    || boundary.requires(Direction::SouthEast)
+                {
                     for y in 0..self.height {
                         let x = self.width - 1;
 
@@ -268,7 +258,27 @@ impl Field {
                     }
                 }
 
-                if boundary.requires(Direction::West) {
+                if boundary.requires(Direction::South) || boundary.requires(Direction::SouthEast)
+                    || boundary.requires(Direction::SouthWest)
+                {
+                    for x in 0..self.width {
+                        let y = self.height - 1;
+                        if !apply_failed_edge(
+                            x,
+                            y,
+                            self.width,
+                            potential_index,
+                            &mut points,
+                            &mut changes,
+                        ) {
+                            return false;
+                        }
+                    }
+                }
+
+                if boundary.requires(Direction::West) || boundary.requires(Direction::NorthWest)
+                    || boundary.requires(Direction::SouthWest)
+                {
                     for y in 0..self.height {
                         if !apply_failed_edge(
                             0,
@@ -353,20 +363,10 @@ impl Field {
     fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
         while !changes.is_empty() {
             if let Some((x, y)) = changes.next() {
-                if !self.propagate_direction(x, y, Direction::North, &mut changes) {
-                    return false;
-                }
-
-                if !self.propagate_direction(x, y, Direction::South, &mut changes) {
-                    return false;
-                }
-
-                if !self.propagate_direction(x, y, Direction::East, &mut changes) {
-                    return false;
-                }
-
-                if !self.propagate_direction(x, y, Direction::West, &mut changes) {
-                    return false;
+                for direction in &Direction::ALL_DIRECTIONS {
+                    if !self.propagate_direction(x, y, *direction, &mut changes) {
+                        return false;
+                    }
                 }
             }
         }
@@ -451,29 +451,17 @@ impl Field {
 
     fn build_delta(&self, x: usize, y: usize, direction: Direction) -> Option<(usize, usize)> {
         match direction {
-            Direction::North => if y == 0 {
-                None
-            } else {
-                Some((x, y - 1))
-            },
-
-            Direction::South => if y == self.height - 1 {
-                None
-            } else {
-                Some((x, y + 1))
-            },
-
-            Direction::East => if x == self.width - 1 {
-                None
-            } else {
-                Some((x + 1, y))
-            },
-
-            Direction::West => if x == 0 {
-                None
-            } else {
-                Some((x - 1, y))
-            },
+            Direction::NorthWest if x > 0 && y > 0 => Some((x - 1, y - 1)),
+            Direction::North if y > 0 => Some((x, y - 1)),
+            Direction::NorthEast if x < self.height - 1 && y > 0 => Some((x + 1, y - 1)),
+            Direction::East if x < self.width - 1 => Some((x + 1, y)),
+            Direction::SouthEast if x < self.width - 1 && y < self.height - 1 => {
+                Some((x + 1, y + 1))
+            }
+            Direction::South if y < self.height - 1 => Some((x, y + 1)),
+            Direction::SouthWest if x > 0 && y < self.height - 1 => Some((x - 1, y + 1)),
+            Direction::West if x > 0 => Some((x - 1, y)),
+            _ => None,
         }
     }
 }

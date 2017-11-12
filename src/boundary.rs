@@ -3,27 +3,50 @@ use std::str;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Direction {
+    NorthWest,
     North,
-    South,
+    NorthEast,
     East,
+    SouthEast,
+    South,
+    SouthWest,
     West,
 }
 
 impl Direction {
+    pub const ALL_DIRECTIONS: [Direction; 8] = [
+        Direction::NorthWest,
+        Direction::North,
+        Direction::NorthEast,
+        Direction::East,
+        Direction::SouthEast,
+        Direction::South,
+        Direction::SouthWest,
+        Direction::West,
+    ];
+
     fn to_index(&self) -> usize {
         match *self {
+            Direction::NorthWest => 0,
             Direction::North => 1,
+            Direction::NorthEast => 2,
             Direction::East => 3,
+            Direction::SouthEast => 4,
             Direction::South => 5,
+            Direction::SouthWest => 6,
             Direction::West => 7,
         }
     }
 
     fn to_opposite_index(&self) -> usize {
         match *self {
+            Direction::NorthWest => 4,
             Direction::North => 5,
+            Direction::NorthEast => 6,
             Direction::East => 7,
+            Direction::SouthEast => 0,
             Direction::South => 1,
+            Direction::SouthWest => 2,
             Direction::West => 3,
         }
     }
@@ -44,17 +67,17 @@ impl Boundary {
             ))
         } else {
             let directions = [
-                None,
+                Some(Direction::NorthWest),
                 Some(Direction::North),
-                None,
+                Some(Direction::NorthEast),
                 None, // dividing character
                 Some(Direction::West),
                 None, // center character
                 Some(Direction::East),
                 None, // dividing character
-                None,
+                Some(Direction::SouthWest),
                 Some(Direction::South),
-                None,
+                Some(Direction::SouthEast),
             ];
 
             let mut result = Boundary::default();
@@ -100,6 +123,12 @@ mod tests {
         let s_e = Boundary::from_str("000|001|010").unwrap();
         let e_w = Boundary::from_str("000|101|000").unwrap();
 
+        let ne = Boundary::from_str("001|000|000").unwrap();
+        let sw = Boundary::from_str("000|000|100").unwrap();
+
+        let nw_e = Boundary::from_str("100|001|000").unwrap();
+        let se_e_w = Boundary::from_str("000|101|001").unwrap();
+
         assert!(n.fits(&s, Direction::North));
         assert!(!n.fits(&n, Direction::South));
 
@@ -111,5 +140,13 @@ mod tests {
 
         assert!(n_e.fits(&s_e, Direction::North));
         assert!(!n_e.fits(&s_e, Direction::East));
+
+        assert!(ne.fits(&sw, Direction::NorthEast));
+        assert!(!ne.fits(&nw_e, Direction::NorthEast));
+
+        assert!(nw_e.fits(&e_w, Direction::East));
+        assert!(e_w.fits(&nw_e, Direction::West));
+
+        assert!(se_e_w.fits(&nw_e, Direction::SouthEast));
     }
 }
