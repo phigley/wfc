@@ -2,24 +2,30 @@ extern crate rand;
 extern crate wfc;
 
 use wfc::field::Field;
-use wfc::entry::Entry;
+use wfc::entry::CharacterEntry;
 use wfc::entry;
 use rand::Rng;
 
 fn main() {
     //let characters = ['─', '┌', '┐', '│', '└', '┘', ' '];
 
+    if let Err(msg) = execute() {
+        println!("{}", msg);
+    }
+}
+
+fn execute() -> Result<(), String> {
     let potentials = [
-        Entry::new('─', 10.0, false, false, true, true),
-        Entry::new('│', 10.0, true, true, false, false),
-        Entry::new('┌', 1.0, false, true, true, false),
-        Entry::new('┐', 1.0, false, true, false, true),
-        Entry::new('└', 1.0, true, false, true, false),
-        Entry::new('┘', 1.0, true, false, false, true),
+        CharacterEntry::build('─', 10.0, "000|101|000")?,
+        CharacterEntry::build('│', 10.0, "010|000|010")?,
+        CharacterEntry::build('┌', 1.0, "000|001|010")?,
+        CharacterEntry::build('┐', 1.0, "000|100|010")?,
+        CharacterEntry::build('└', 1.0, "010|001|000")?,
+        CharacterEntry::build('┘', 1.0, "010|100|000")?,
         // Notice that adding the ' ' character causes many failures!
         // Not re-assuring for this technique to be used as a decent
         // constraint solution.
-        // Entry::new(' ', 1.0, false, false, false, false),
+        // CharacterEntry::build(' ', 1.0, "000|000|000")?,
     ];
 
     let mut field = Field::new(&potentials, 80, 40);
@@ -41,13 +47,14 @@ fn main() {
                 }
             }
         }
+        Ok(())
     } else {
-        println!("Could not close edges");
+        Err(String::from("Could not close edges"))
     }
 }
 
 fn run_field<R: Rng>(
-    potentials: &[Entry],
+    potentials: &[CharacterEntry],
     mut field: Field,
     mut rng: &mut R,
 ) -> Result<String, String> {

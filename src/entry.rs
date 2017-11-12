@@ -1,30 +1,40 @@
 
 use boundary::Boundary;
 
-pub struct Entry {
-    pub character: char,
-    pub weight: f32,
-    pub(crate) boundary: Boundary,
+pub trait Entry {
+    fn weight(&self) -> f32;
+    fn boundary(&self) -> &Boundary;
 }
 
-impl Entry {
-    pub fn new(
-        character: char,
-        weight: f32,
-        north: bool,
-        south: bool,
-        east: bool,
-        west: bool,
-    ) -> Entry {
-        Entry {
+pub struct CharacterEntry {
+    pub character: char,
+    pub weight: f32,
+    boundary: Boundary,
+}
+
+impl CharacterEntry {
+    pub fn build(character: char, weight: f32, borders: &str) -> Result<CharacterEntry, String> {
+        let boundary = Boundary::from_str(borders)?;
+
+        Ok(CharacterEntry {
             character,
             weight,
-            boundary: Boundary::new(north, south, east, west),
-        }
+            boundary,
+        })
     }
 }
 
-pub fn make_string(potentials: &[Entry], indices: &[Vec<usize>]) -> String {
+impl Entry for CharacterEntry {
+    fn weight(&self) -> f32 {
+        self.weight
+    }
+
+    fn boundary(&self) -> &Boundary {
+        &self.boundary
+    }
+}
+
+pub fn make_string(potentials: &[CharacterEntry], indices: &[Vec<usize>]) -> String {
     let mut result = String::new();
 
     for row in indices {

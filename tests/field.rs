@@ -2,14 +2,14 @@ extern crate rand;
 extern crate wfc;
 
 use wfc::entry;
-use wfc::entry::Entry;
+use wfc::entry::CharacterEntry;
 use wfc::field::Field;
 
 #[test]
 fn simple_field_propagate_fail() {
     let potentials = [
-        Entry::new('-', 1.0, false, false, true, true),
-        Entry::new('┌', 1.0, false, true, true, false),
+        CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+        CharacterEntry::build('┌', 1.0, "000|001|010").unwrap(),
     ];
 
     let mut field = Field::new(&potentials, 2, 2);
@@ -19,10 +19,10 @@ fn simple_field_propagate_fail() {
 #[test]
 fn simple_field_full_propagate() {
     let potentials = [
-        Entry::new('┌', 1.0, false, true, true, false),
-        Entry::new('┐', 1.0, false, true, false, true),
-        Entry::new('└', 1.0, true, false, true, false),
-        Entry::new('┘', 1.0, true, false, false, true),
+        CharacterEntry::build('┌', 1.0, "000|001|010").unwrap(),
+        CharacterEntry::build('┐', 1.0, "000|100|010").unwrap(),
+        CharacterEntry::build('└', 1.0, "010|001|000").unwrap(),
+        CharacterEntry::build('┘', 1.0, "010|100|000").unwrap(),
     ];
 
     let mut field = Field::new(&potentials, 2, 2);
@@ -48,8 +48,8 @@ fn simple_field_full_propagate() {
 #[test]
 fn simple_field_closed_edges_fail() {
     let potentials = [
-        Entry::new('-', 1.0, false, false, true, true),
-        Entry::new('|', 1.0, true, true, false, false),
+        CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+        CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
     ];
 
     let mut field = Field::new(&potentials, 2, 2);
@@ -59,9 +59,9 @@ fn simple_field_closed_edges_fail() {
 #[test]
 fn simple_field_closed_edges() {
     let potentials = [
-        Entry::new('-', 1.0, false, false, true, true),
-        Entry::new('|', 1.0, true, true, false, false),
-        Entry::new(' ', 1.0, false, false, false, false),
+        CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+        CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
+        CharacterEntry::build(' ', 1.0, "000|000|000").unwrap(),
     ];
 
     let mut field = Field::new(&potentials, 2, 2);
@@ -80,10 +80,10 @@ fn simple_field_closed_edges() {
 #[test]
 fn simple_field_closed_edges2() {
     let potentials = [
-        Entry::new('┌', 1.0, false, true, true, false),
-        Entry::new('┐', 1.0, false, true, false, true),
-        Entry::new('└', 1.0, true, false, true, false),
-        Entry::new('┘', 1.0, true, false, false, true),
+        CharacterEntry::build('┌', 1.0, "000|001|010").unwrap(),
+        CharacterEntry::build('┐', 1.0, "000|100|010").unwrap(),
+        CharacterEntry::build('└', 1.0, "010|001|000").unwrap(),
+        CharacterEntry::build('┘', 1.0, "010|100|000").unwrap(),
     ];
 
     let mut field = Field::new(&potentials, 2, 2);

@@ -1,3 +1,6 @@
+use std::string::String;
+use std::str;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Direction {
     North,
@@ -6,41 +9,81 @@ pub enum Direction {
     West,
 }
 
-#[derive(Debug, Clone)]
+impl Direction {
+    fn to_index(&self) -> usize {
+        match *self {
+            Direction::North => 1,
+            Direction::East => 3,
+            Direction::South => 5,
+            Direction::West => 7,
+        }
+    }
+
+    fn to_opposite_index(&self) -> usize {
+        match *self {
+            Direction::North => 5,
+            Direction::East => 7,
+            Direction::South => 1,
+            Direction::West => 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Boundary {
-    north: bool,
-    south: bool,
-    east: bool,
-    west: bool,
+    boundaries: [bool; 8],
 }
 
 impl Boundary {
-    pub fn new(north: bool, south: bool, east: bool, west: bool) -> Boundary {
-        Boundary {
-            north,
-            east,
-            south,
-            west,
+    pub fn from_str(borders: &str) -> Result<Boundary, String> {
+        if borders.len() != 11 {
+            Err(format!(
+                "Boundary::from_str(\"{}\") is incorrect.  Input length is {}, expected 11.",
+                borders,
+                borders.len()
+            ))
+        } else {
+            let directions = [
+                None,
+                Some(Direction::North),
+                None,
+                None, // dividing character
+                Some(Direction::West),
+                None, // center character
+                Some(Direction::East),
+                None, // dividing character
+                None,
+                Some(Direction::South),
+                None,
+            ];
+
+            let mut result = Boundary::default();
+
+            for (c, possible_direction) in borders.as_bytes().iter().zip(&directions) {
+                if let Some(direction) = *possible_direction {
+                    if *c == ('1' as u8) {
+                        result.boundaries[direction.to_index()] = true;
+                    } else if *c != ('0' as u8) {
+                        return Err(format!(
+                            "Found invalid character '{}' in Bound::from_str(\"{}\")",
+                            (*c as char),
+                            borders
+                        ));
+                    }
+                }
+            }
+
+            Ok(result)
         }
     }
 
     // returns true if the other fits on direction side.
     pub fn fits(&self, other: &Boundary, direction: Direction) -> bool {
-        match direction {
-            Direction::North => self.north == other.south,
-            Direction::East => self.east == other.west,
-            Direction::South => self.south == other.north,
-            Direction::West => self.west == other.east,
-        }
+        self.boundaries[direction.to_index()] == other.boundaries[direction.to_opposite_index()]
     }
 
     pub fn requires(&self, direction: Direction) -> bool {
-        match direction {
-            Direction::North => self.north,
-            Direction::East => self.east,
-            Direction::South => self.south,
-            Direction::West => self.west,
-        }
+        self.boundaries[direction.to_index()]
     }
 }
 
@@ -51,24 +94,22 @@ mod tests {
 
     #[test]
     fn boundaries_match() {
-        let n = Boundary::new(true, false, false, false);
-        let s = Boundary::new(false, true, false, false);
-
-        let ne = Boundary::new(true, false, true, false);
-        let se = Boundary::new(false, true, true, false);
-
-        let ew = Boundary::new(false, false, true, true);
+        let n = Boundary::from_str("010|000|000").unwrap();
+        let s = Boundary::from_str("000|000|010").unwrap();
+        let n_e = Boundary::from_str("010|001|000").unwrap();
+        let s_e = Boundary::from_str("000|001|010").unwrap();
+        let e_w = Boundary::from_str("000|101|000").unwrap();
 
         assert!(n.fits(&s, Direction::North));
         assert!(!n.fits(&n, Direction::South));
 
-        assert!(ne.fits(&ew, Direction::East));
-        assert!(!ne.fits(&ew, Direction::North));
+        assert!(n_e.fits(&e_w, Direction::East));
+        assert!(!n_e.fits(&e_w, Direction::North));
 
-        assert!(ew.fits(&ew, Direction::East));
-        assert!(ew.fits(&ne, Direction::West));
+        assert!(e_w.fits(&e_w, Direction::East));
+        assert!(e_w.fits(&n_e, Direction::West));
 
-        assert!(ne.fits(&se, Direction::North));
-        assert!(!ne.fits(&se, Direction::East));
+        assert!(n_e.fits(&s_e, Direction::North));
+        assert!(!n_e.fits(&s_e, Direction::East));
     }
 }

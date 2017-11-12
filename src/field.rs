@@ -180,20 +180,20 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(potentials: &[Entry], width: usize, height: usize) -> Field {
+    pub fn new<E: Entry>(potentials: &[E], width: usize, height: usize) -> Field {
         let num_potentials = potentials.len();
         let mut boundaries = Vec::with_capacity(num_potentials);
         let mut weights = Vec::with_capacity(num_potentials);
 
         for entry in potentials {
-            boundaries.push(entry.boundary.clone());
-            weights.push(PointWeight::new(entry.weight));
+            boundaries.push(entry.boundary().clone());
+            weights.push(PointWeight::new(entry.weight()));
         }
 
         let mut prototype_fieldpoint = FieldPoint::new(num_potentials);
 
         for (entry_index, entry) in potentials.iter().enumerate() {
-            if entry.weight <= 0.0 {
+            if entry.weight() <= 0.0 {
                 prototype_fieldpoint.invalidate(entry_index);
             }
         }
@@ -543,7 +543,7 @@ mod tests {
 
     use super::*;
 
-    use entry;
+    use entry::CharacterEntry;
     use rand;
 
     #[test]
@@ -648,9 +648,9 @@ mod tests {
     #[test]
     fn simple_field_propagate_north() {
         let potentials = [
-            Entry::new('-', 1.0, false, false, true, true),
-            Entry::new('|', 1.0, true, true, false, false),
-            Entry::new(' ', 1.0, false, false, false, false),
+            CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+            CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
+            CharacterEntry::build(' ', 1.0, "000|000|000").unwrap(),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -669,9 +669,9 @@ mod tests {
     #[test]
     fn simple_field_propagate_south() {
         let potentials = [
-            Entry::new('-', 1.0, false, false, true, true),
-            Entry::new('|', 1.0, true, true, false, false),
-            Entry::new(' ', 1.0, false, false, false, false),
+            CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+            CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
+            CharacterEntry::build(' ', 1.0, "000|000|000").unwrap(),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -690,9 +690,9 @@ mod tests {
     #[test]
     fn simple_field_propagate_east() {
         let potentials = [
-            Entry::new('-', 1.0, false, false, true, true),
-            Entry::new('|', 1.0, true, true, false, false),
-            Entry::new(' ', 1.0, false, false, false, false),
+            CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+            CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
+            CharacterEntry::build(' ', 1.0, "000|000|000").unwrap(),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -711,9 +711,9 @@ mod tests {
     #[test]
     fn simple_field_propagate_west() {
         let potentials = [
-            Entry::new('-', 1.0, false, false, true, true),
-            Entry::new('|', 1.0, true, true, false, false),
-            Entry::new(' ', 1.0, false, false, false, false),
+            CharacterEntry::build('-', 1.0, "000|101|000").unwrap(),
+            CharacterEntry::build('|', 1.0, "010|000|010").unwrap(),
+            CharacterEntry::build(' ', 1.0, "000|000|000").unwrap(),
         ];
 
         let mut field = Field::new(&potentials, 2, 2);
@@ -732,10 +732,10 @@ mod tests {
     #[test]
     fn zero_weight_invalidated() {
         let potentials = [
-            Entry::new('┌', 0.1, false, true, true, false),
-            Entry::new('┐', 1.0, false, true, false, true),
-            Entry::new('└', 0.0, true, false, true, false),
-            Entry::new('┘', -1.0, true, false, false, true),
+            CharacterEntry::build('┌', 0.1, "000|001|010").unwrap(),
+            CharacterEntry::build('┐', 1.0, "000|100|010").unwrap(),
+            CharacterEntry::build('└', 0.0, "010|001|000").unwrap(),
+            CharacterEntry::build('┘', -1.0, "010|100|000").unwrap(),
         ];
 
         let field = Field::new(&potentials, 2, 2);
