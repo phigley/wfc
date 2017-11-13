@@ -1,5 +1,6 @@
 
 use std::f32;
+use std::usize;
 
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
@@ -13,19 +14,24 @@ use entry::Entry;
 struct FieldPoint {
     num_allowed: usize,
     allowed: Vec<bool>,
+    invalidate_step: Vec<Option<usize>>,
+    max_invalidate_step: Option<usize>,
 }
 
 impl FieldPoint {
     fn new(num_allowed: usize) -> FieldPoint {
         let allowed = vec![true; num_allowed];
+        let invalidate_step = vec![None; num_allowed];
 
         FieldPoint {
             num_allowed,
             allowed,
+            invalidate_step,
+            max_invalidate_step: None,
         }
     }
 
-    fn invalidate(&mut self, index: usize) {
+    fn invalidate(&mut self, index: usize, step: usize) {
         let element = &mut self.allowed[index];
 
         if *element {
@@ -33,19 +39,32 @@ impl FieldPoint {
 
             assert!(self.num_allowed > 0);
             self.num_allowed -= 1;
+
+            assert!(self.invalidate_step[index] == None);
+            self.invalidate_step[index] = Some(step);
+            self.max_invalidate_step = Some(step);
         }
     }
 
-    fn force(&mut self, index: usize) {
+    fn force(&mut self, index: usize, step: usize) {
         for allow in &mut self.allowed {
             *allow = false;
         }
 
+        for invalidate in &mut self.invalidate_step {
+            if *invalidate == None {
+                *invalidate = Some(step);
+            }
+        }
+
         self.allowed[index] = true;
         self.num_allowed = 1;
+
+        self.invalidate_step[index] = None;
+        self.max_invalidate_step = Some(step);
     }
 
-    fn choose<R: Rng>(&mut self, weights: &[PointWeight], mut rng: &mut R) {
+    fn choose<R: Rng>(&self, weights: &[PointWeight], mut rng: &mut R) -> Option<usize> {
         assert!(self.num_allowed > 0);
 
         let normalized_range = Range::new(0.0, 1.0f32);
@@ -64,10 +83,27 @@ impl FieldPoint {
             }
         }
 
-        if let Some(index) = current_choice {
-            self.force(index);
-        } else {
-            panic!("did not find an index!");
+        current_choice
+    }
+
+    fn revert_to(&mut self, step: usize) {
+        if self.max_invalidate_step > Some(step) {
+            let num_potentials = self.allowed.len();
+
+            self.max_invalidate_step = None;
+
+            for p in 0..num_potentials {
+                if self.invalidate_step[p] > Some(step) {
+                    assert!(!self.allowed[p]);
+                    self.allowed[p] = true;
+                    self.invalidate_step[p] = None;
+                    self.num_allowed += 1;
+                } else {
+                    if self.invalidate_step[p] > self.max_invalidate_step {
+                        self.max_invalidate_step = self.invalidate_step[p];
+                    }
+                }
+            }
         }
     }
 
@@ -177,6 +213,9 @@ pub struct Field {
     height: usize,
 
     points: Vec<FieldPoint>,
+    steps: Vec<(usize, usize)>, // (point_index, potential_index)
+
+    allow_backtracking: bool,
 }
 
 impl Field {
@@ -194,7 +233,7 @@ impl Field {
 
         for (entry_index, entry) in potentials.iter().enumerate() {
             if entry.weight() <= 0.0 {
-                prototype_fieldpoint.invalidate(entry_index);
+                prototype_fieldpoint.invalidate(entry_index, 0);
             }
         }
 
@@ -203,6 +242,9 @@ impl Field {
         let mut points = Vec::new();
         points.resize(num_points, prototype_fieldpoint);
 
+        // There should be no more than num_points steps to solve it!
+        let steps = Vec::with_capacity(num_points);
+
         Field {
             num_potentials,
             boundaries,
@@ -210,11 +252,22 @@ impl Field {
             width,
             height,
             points,
+            steps,
+            allow_backtracking: false,
+        }
+    }
+
+    pub fn allow_backtracking(self) -> Field {
+        Field {
+            allow_backtracking: true,
+            ..self
         }
     }
 
     pub fn close_edges(&mut self) -> bool {
         let mut changes = ChangeQueue::new();
+
+        let current_step = self.steps.len();
 
         {
             let mut points: &mut [FieldPoint] = &mut self.points;
@@ -232,6 +285,7 @@ impl Field {
                             self.width,
                             potential_index,
                             &mut points,
+                            current_step,
                             &mut changes,
                         ) {
                             return false;
@@ -251,6 +305,7 @@ impl Field {
                             self.width,
                             potential_index,
                             &mut points,
+                            current_step,
                             &mut changes,
                         ) {
                             return false;
@@ -269,6 +324,7 @@ impl Field {
                             self.width,
                             potential_index,
                             &mut points,
+                            current_step,
                             &mut changes,
                         ) {
                             return false;
@@ -286,6 +342,7 @@ impl Field {
                             self.width,
                             potential_index,
                             &mut points,
+                            current_step,
                             &mut changes,
                         ) {
                             return false;
@@ -303,7 +360,7 @@ impl Field {
 
         {
             let point = &mut self.points[point_index];
-            point.force(potential_index);
+            point.force(potential_index, self.steps.len());
         }
 
         let mut changes = ChangeQueue::new();
@@ -313,19 +370,35 @@ impl Field {
     }
 
     pub fn step<R: Rng>(&mut self, mut rng: &mut R) -> bool {
-        let possible_best_point = self.observe(&mut rng);
+        let mut possible_best_point = self.observe(&mut rng);
 
-        match possible_best_point {
-            None => false,
-            Some(FoundFieldPoint { point_index, .. }) => {
-                {
-                    let point = &mut self.points[point_index];
-                    point.choose(&self.weights, &mut rng);
+        loop {
+            match possible_best_point {
+                None => break false,
+                Some(FoundFieldPoint { point_index, .. }) => {
+                    match self.points[point_index].choose(&self.weights, &mut rng) {
+                        Some(choosen_potential) => {
+                            self.steps.push((point_index, choosen_potential));
+
+                            self.points[point_index].force(choosen_potential, self.steps.len());
+
+                            let mut changes = ChangeQueue::new();
+                            changes.add(generate_coord(point_index, self.width));
+
+                            if self.propagate(changes) {
+                                break true;
+                            } else {
+                                possible_best_point = self.revert();
+                            }
+                        }
+
+                        None => {
+                            // This should never happen
+                            assert!(false);
+                            break false;
+                        }
+                    }
                 }
-                let mut changes = ChangeQueue::new();
-                changes.add(generate_coord(point_index, self.width));
-
-                self.propagate(changes)
             }
         }
     }
@@ -361,10 +434,12 @@ impl Field {
     }
 
     fn propagate(&mut self, mut changes: ChangeQueue<(usize, usize)>) -> bool {
+        let current_step = self.steps.len();
+
         while !changes.is_empty() {
             if let Some((x, y)) = changes.next() {
                 for direction in &Direction::ALL_DIRECTIONS {
-                    if !self.propagate_direction(x, y, *direction, &mut changes) {
+                    if !self.propagate_direction(x, y, current_step, *direction, &mut changes) {
                         return false;
                     }
                 }
@@ -374,6 +449,42 @@ impl Field {
         true
     }
 
+    fn revert(&mut self) -> Option<FoundFieldPoint> {
+        if self.allow_backtracking {
+            while let Some((point_index, chosen_potential)) = self.steps.pop() {
+                let current_step = self.steps.len();
+
+                // Restore points to their values at the step we just reverted.
+                for point in &mut self.points {
+                    point.revert_to(current_step);
+                }
+
+                // Invalidate the choice that we made so we don't repeat it.
+                self.points[point_index].invalidate(chosen_potential, current_step);
+
+                // Propagate that invalidation.
+                let mut revert_changes = ChangeQueue::new();
+                revert_changes.add(generate_coord(point_index, self.width));
+
+                if self.propagate(revert_changes) {
+                    // We are back to consistent state, loop around knowing
+                    // that we won't choose that option again.
+                    return Some(FoundFieldPoint::new(
+                        &self.points[point_index],
+                        point_index,
+                        &self.weights,
+                    ));
+                }
+
+                // Invalidating that choice left us in an inconsistent state still,
+                // so restore all of our choices and revert the previous step.
+                for point in &mut self.points {
+                    point.revert_to(current_step);
+                }
+            }
+        }
+        None
+    }
     pub fn render(&self) -> Option<Vec<Vec<usize>>> {
         let mut result = Vec::with_capacity(self.height);
 
@@ -426,6 +537,7 @@ impl Field {
         &mut self,
         x: usize,
         y: usize,
+        current_step: usize,
         direction: Direction,
         changes: &mut ChangeQueue<(usize, usize)>,
     ) -> bool {
@@ -436,7 +548,13 @@ impl Field {
             if let Some((source_point, mut test_point)) =
                 extract_two_elements(&mut self.points, source_point_index, test_point_index)
             {
-                if test_direction(&self.boundaries, source_point, &mut test_point, direction) {
+                if test_direction(
+                    &self.boundaries,
+                    source_point,
+                    &mut test_point,
+                    current_step,
+                    direction,
+                ) {
                     if test_point.num_allowed == 0 {
                         return false;
                     }
@@ -479,6 +597,7 @@ fn test_direction(
     potentials: &[Boundary],
     source_point: &FieldPoint,
     test_point: &mut FieldPoint,
+    current_step: usize,
     direction: Direction,
 ) -> bool {
     let mut changed = false;
@@ -497,7 +616,7 @@ fn test_direction(
             }
 
             if !fits {
-                test_point.invalidate(test_index);
+                test_point.invalidate(test_index, current_step);
                 changed = true;
             }
         }
@@ -512,11 +631,12 @@ fn apply_failed_edge(
     width: usize,
     potential_index: usize,
     points: &mut [FieldPoint],
+    current_step: usize,
     changes: &mut ChangeQueue<(usize, usize)>,
 ) -> bool {
     let point_index = generate_index(x, y, width);
     let point = &mut points[point_index];
-    point.invalidate(potential_index);
+    point.invalidate(potential_index, current_step);
 
     if point.num_allowed > 0 {
         changes.add((x, y));
@@ -559,22 +679,90 @@ mod tests {
 
         assert_eq!(f0.num_allowed, 3);
 
-        f0.invalidate(0);
+        f0.invalidate(0, 0);
         assert_eq!(f0.allowed[0], false);
         assert_eq!(f0.num_allowed, 2);
 
-        f0.invalidate(2);
+        f0.invalidate(2, 0);
         assert_eq!(f0.allowed[2], false);
         assert_eq!(f0.num_allowed, 1);
 
         // test repeated invalidation
-        f0.invalidate(2);
+        f0.invalidate(2, 0);
         assert_eq!(f0.allowed[2], false);
         assert_eq!(f0.num_allowed, 1);
 
-        f0.invalidate(1);
+        f0.invalidate(1, 0);
         assert_eq!(f0.allowed[1], false);
         assert_eq!(f0.num_allowed, 0);
+    }
+
+    #[test]
+    fn revert_fieldpoint() {
+        let mut f0 = FieldPoint::new(3);
+
+        assert_eq!(f0.allowed[0], true);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], true);
+        assert_eq!(f0.num_allowed, 3);
+        assert_eq!(f0.max_invalidate_step, None);
+
+        f0.invalidate(0, 1);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], true);
+        assert_eq!(f0.num_allowed, 2);
+        assert_eq!(f0.max_invalidate_step, Some(1));
+
+        f0.invalidate(2, 2);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], false);
+        assert_eq!(f0.num_allowed, 1);
+        assert_eq!(f0.max_invalidate_step, Some(2));
+
+        // test repeated invalidation
+        f0.invalidate(2, 3);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], false);
+        assert_eq!(f0.num_allowed, 1);
+        assert_eq!(f0.max_invalidate_step, Some(2));
+
+        f0.invalidate(1, 4);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], false);
+        assert_eq!(f0.allowed[2], false);
+        assert_eq!(f0.num_allowed, 0);
+        assert_eq!(f0.max_invalidate_step, Some(4));
+
+        f0.revert_to(3);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], false);
+        assert_eq!(f0.num_allowed, 1);
+        assert_eq!(f0.max_invalidate_step, Some(2));
+
+        f0.revert_to(2);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], false);
+        assert_eq!(f0.num_allowed, 1);
+        assert_eq!(f0.max_invalidate_step, Some(2));
+
+        f0.revert_to(1);
+        assert_eq!(f0.allowed[0], false);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], true);
+        assert_eq!(f0.num_allowed, 2);
+        assert_eq!(f0.max_invalidate_step, Some(1));
+
+        f0.revert_to(0);
+        assert_eq!(f0.allowed[0], true);
+        assert_eq!(f0.allowed[1], true);
+        assert_eq!(f0.allowed[2], true);
+        assert_eq!(f0.num_allowed, 3);
+        assert_eq!(f0.max_invalidate_step, None);
     }
 
     #[test]
@@ -588,18 +776,11 @@ mod tests {
 
         let mut rng = rand::thread_rng();
 
+        let fieldpoint = FieldPoint::new(4);
+
         for _ in 0..20 {
-            let mut fieldpoint = FieldPoint::new(4);
-
-            fieldpoint.choose(&weights, &mut rng);
-
-            assert_eq!(fieldpoint.num_allowed, 1);
-
-            if let Some(chosen_index) = fieldpoint.extract_selection() {
-                assert!(chosen_index < 4);
-            } else {
-                panic!("failed to extract selection");
-            }
+            let chosen_index = fieldpoint.choose(&weights, &mut rng).unwrap();
+            assert!(chosen_index < 4);
         }
     }
 
@@ -617,7 +798,7 @@ mod tests {
         let mut fieldpoint_0 = FieldPoint::new(4);
         let mut fieldpoint_1 = FieldPoint::new(4);
 
-        fieldpoint_1.invalidate(0);
+        fieldpoint_1.invalidate(0, 0);
 
         let inital_best_fieldpoint_a = FoundFieldPoint::new(&fieldpoint_0, 0, &weights);
         let best_fieldpoint_a =
@@ -625,7 +806,7 @@ mod tests {
 
         assert_eq!(best_fieldpoint_a.point_index, 1);
 
-        fieldpoint_0.invalidate(1);
+        fieldpoint_0.invalidate(1, 0);
         let inital_best_fieldpoint_b = FoundFieldPoint::new(&fieldpoint_0, 0, &weights);
         let best_fieldpoint_b =
             inital_best_fieldpoint_b.possibly_better(&fieldpoint_1, 1, &weights, &mut rng);

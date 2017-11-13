@@ -16,24 +16,24 @@ fn main() {
 
 fn execute() -> Result<(), String> {
     let potentials = [
-        CharacterEntry::build('─', 10.0, "000|101|000")?,
-        CharacterEntry::build('│', 10.0, "010|000|010")?,
-        CharacterEntry::build('┌', 1.0, "000|001|010")?,
-        CharacterEntry::build('┐', 1.0, "000|100|010")?,
-        CharacterEntry::build('└', 1.0, "010|001|000")?,
-        CharacterEntry::build('┘', 1.0, "010|100|000")?,
+        // CharacterEntry::build('─', 10.0, "000|101|000")?,
+        // CharacterEntry::build('│', 10.0, "010|000|010")?,
+        // CharacterEntry::build('┌', 1.0, "000|001|010")?,
+        // CharacterEntry::build('┐', 1.0, "000|100|010")?,
+        // CharacterEntry::build('└', 1.0, "010|001|000")?,
+        // CharacterEntry::build('┘', 1.0, "010|100|000")?,
         // Notice that adding the ' ' character causes many failures!
         // Not re-assuring for this technique to be used as a decent
         // constraint solution.
-        // CharacterEntry::build(' ', 1.0, "000|000|000")?,
-        // CharacterEntry::build('╱', 1.0, "001|000|100")?,
-        // CharacterEntry::build('╲', 1.0, "100|000|001")?,
-        // CharacterEntry::build('╳', 1.0, "101|000|101")?,
+        CharacterEntry::build(' ', 1.0, "000|000|000")?,
+        CharacterEntry::build('╱', 1.0, "001|000|100")?,
+        CharacterEntry::build('╲', 1.0, "100|000|001")?,
+        CharacterEntry::build('╳', 1.0, "101|000|101")?,
     ];
 
-    let mut field = Field::new(&potentials, 80, 40);
+    let mut field = Field::new(&potentials, 80, 40).allow_backtracking();
 
-    if field.close_edges() {
+    if true || field.close_edges() {
         let mut rng = rand::thread_rng();
 
         // Building an entrance requires the square pieces and space.
